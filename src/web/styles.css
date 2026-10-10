@@ -13,6 +13,11 @@
   --ok: #1a7f37;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --syntax-comment: #8a8a90;
+  --syntax-keyword: #8a3ffc;
+  --syntax-id: #0f5fbf;
+  --syntax-key: #a1500b;
+  --syntax-value: #1a7f37;
   color-scheme: light dark;
 }
 
@@ -30,6 +35,11 @@
     --err: #ff8a80;
     --err-soft: #3d1d1b;
     --ok: #6fdc8c;
+    --syntax-comment: #7d7d86;
+    --syntax-keyword: #c4a0ff;
+    --syntax-id: #7aa7ff;
+    --syntax-key: #f0b35a;
+    --syntax-value: #7ee2a0;
   }
 }
 
@@ -220,6 +230,8 @@ button, input, select { font: inherit; color: inherit; }
 button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; }
 .change { margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 12.5px; }
 .change-title { font-weight: 600; margin-bottom: 4px; }
+.change-note { margin-top: 4px; }
+.change-note:first-child { margin-top: 0; }
 .change pre { margin: 0; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .change .minus { color: var(--err); }
 .change .plus { color: var(--ok); }

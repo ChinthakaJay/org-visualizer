@@ -2,7 +2,7 @@ import { addLine, setField, type TextEdit } from './edits';
 
 /** What a walkthrough step did: the new text and the line that changed, or a note when it isn't one line. */
 export interface StepResult extends TextEdit {
-  /** Explains a step that isn't a single-line edit. */
+  /** Explains what a step did beyond (or instead of) its one changed line. */
   note?: string;
   /** For view-only steps: the Teams to show collapsed afterwards. */
   collapse?: string[];
@@ -43,10 +43,10 @@ export const WALKTHROUGHS: Walkthrough[] = [
       {
         label: 'A new top-level Team, Group Tech, holds FinTech and Platform',
         run: (t) => {
-          let r = addLine(t, 'team group    : Group Tech');
-          r = setField(r.text, 'team', 'fintech', 'parent', 'group');
+          const added = addLine(t, 'team group    : Group Tech');
+          let r = setField(added.text, 'team', 'fintech', 'parent', 'group');
           r = setField(r.text, 'team', 'platform', 'parent', 'group');
-          return { text: r.text, line: null, before: null, after: null, note: 'One new Team line, plus parent=group on the FinTech and Platform lines.' };
+          return { ...added, text: r.text, note: 'Plus parent=group on the FinTech and Platform lines.' };
         },
       },
     ],

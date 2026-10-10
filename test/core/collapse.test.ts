@@ -102,7 +102,7 @@ describe('buildScene: Collapsed teams', () => {
 
 describe('teamDepths', () => {
   it('gives each Team its depth in the team tree, for "Collapse to depth N"', () => {
-    const depths = teamDepths(parse(ORG + 'x : X | team=ghost\n'));
-    expect(Object.fromEntries(depths)).toEqual({ fintech: 0, platform: 0, payments: 1, cards: 2, risk: 1, ghost: 0 });
+    const depths = teamDepths(parse(ORG + 'x : X | team=unknown\n'));
+    expect(Object.fromEntries(depths)).toEqual({ fintech: 0, platform: 0, payments: 1, cards: 2, risk: 1, unknown: 0 });
   });
 });

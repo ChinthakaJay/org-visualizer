@@ -156,6 +156,23 @@ describe('server: saving the Org file', () => {
     expect(await readFile(file, 'utf8')).toBe('a : Changed outside\n');
   });
 
+  it('treats a deleted Org file as a change on disk, so the client can choose to save over it', async () => {
+    const file = join(dir, 'org.txt');
+    await writeFile(file, 'a : A\n');
+    const { url } = await start(file);
+    const { version } = await (await fetch(`${url}/api/file`)).json();
+    await rm(file);
+
+    const res = await save(url, { text: 'a : Mine\n', baseVersion: version });
+    expect(res.status).toBe(409);
+    const disk = await res.json();
+    expect(disk.text).toBe('');
+
+    const again = await save(url, { text: 'a : Mine\n', baseVersion: disk.version });
+    expect(again.status).toBe(200);
+    expect(await readFile(file, 'utf8')).toBe('a : Mine\n');
+  });
+
   it('rejects a save without text', async () => {
     const file = join(dir, 'org.txt');
     const { url } = await start(file);

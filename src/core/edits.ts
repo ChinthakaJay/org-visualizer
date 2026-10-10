@@ -17,7 +17,7 @@ export function addLine(text: string, line: string): TextEdit {
   return { text: `${body}\n${line}\n`, line: body.split('\n').length + 1, before: null, after: line };
 }
 
-/** Define a Placeholder Person or Team by appending a stub line for it, ready to fill in. */
+/** Define a Placeholder Person or Team by appending a line that defines it, ready to fill in. */
 export function definePlaceholder(text: string, kind: 'person' | 'team', id: string): TextEdit {
   return addLine(text, kind === 'team' ? `team ${id} : ${id}` : `${id} : ${id}`);
 }

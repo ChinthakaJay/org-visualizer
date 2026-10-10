@@ -11,6 +11,7 @@ import {
 } from '@codemirror/view';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import type { Problem } from '../core';
+import { orgFileSyntax } from './orgLanguage';
 
 export interface EditorHandle {
   getText(): string;
@@ -50,6 +51,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
         extensions: [
           lineNumbers(),
           lintGutter(),
+          orgFileSyntax,
           highlightActiveLineGutter(),
           highlightActiveLine(),
           drawSelection(),

@@ -65,8 +65,8 @@ describe('Team colours', () => {
   });
 
   it('draws Placeholder Teams with no colour (neutral grey) and dashed', async () => {
-    const scene = await sceneOf('x : X | team=ghost');
-    expect(box(scene, 'ghost')).toMatchObject({ placeholder: true, colour: null });
+    const scene = await sceneOf('x : X | team=unknown');
+    expect(box(scene, 'unknown')).toMatchObject({ placeholder: true, colour: null });
   });
 
   it("tints each card with its Team's colour, and leaves loose cards untinted", async () => {

@@ -59,3 +59,11 @@ export function teamDepths(org: Org): Map<string, number> {
   for (const id of org.teams.keys()) depthOf(id);
   return depths;
 }
+
+/** A Team and the Teams containing it, innermost first. Empty for no Team. */
+export function teamChain(org: Pick<Org, 'teams'>, teamId: string | null): Team[] {
+  const chain: Team[] = [];
+  // Parse cuts Team loops, so walking up always ends.
+  for (let t = teamId ? org.teams.get(teamId) : undefined; t; t = t.parent ? org.teams.get(t.parent) : undefined) chain.push(t);
+  return chain;
+}

@@ -158,7 +158,7 @@ function TeamBoxView({ team, highlighted, onToggle, onSelectLine, onDefine }: Te
   );
 }
 
-/** The "+ Define" action on a Placeholder: adds a stub line for it to the Org file. */
+/** The "+ Define" action on a Placeholder: adds a line that defines it to the Org file. */
 function DefineButton({ x, y, label, onClick }: { x: number; y: number; label: string; onClick(): void }) {
   return (
     <g

@@ -48,7 +48,7 @@ describe('parse: Placeholders', () => {
   });
 
   it('makes one Placeholder for several references, with a Problem on each referencing line', () => {
-    const org = parse(lines('a : A | reports=boss', 'b : B | reports=boss'));
+    const org = parse(lines('a : A | reports=lead', 'b : B | reports=lead'));
     expect([...org.people.values()].filter((p) => p.placeholder)).toHaveLength(1);
     expect(org.problems.map((p) => p.line)).toEqual([1, 2]);
   });

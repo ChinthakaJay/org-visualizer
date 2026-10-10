@@ -1,4 +1,4 @@
-import type { Org, Rect, Scene } from '../core';
+import { teamChain, type Org, type Rect, type Scene } from '../core';
 
 export interface ChartElement {
   /** "person:<id>" or "team:<id>", as the chart's highlight expects. */
@@ -20,8 +20,8 @@ export function elementForLine(org: Org, scene: Scene, line: number): ChartEleme
     if (card) return { key: `person:${card.id}`, rect: card };
   }
   // Walk up the team tree to the box that's actually drawn.
-  for (let t = person ? (person.team ? org.teams.get(person.team) : undefined) : team; t; t = t.parent ? org.teams.get(t.parent) : undefined) {
-    const box = scene.teams.find((b) => b.id === t!.id);
+  for (const t of teamChain(org, person ? person.team : team!.id)) {
+    const box = scene.teams.find((b) => b.id === t.id);
     if (box && (box.collapsed || t === team)) return { key: `team:${box.id}`, rect: box };
   }
   return null;

@@ -67,7 +67,8 @@ describe('walkthroughs', () => {
     expect(steps[1].result).toMatchObject({ line: 6, after: 'team risk     : Risk      | parent=payments' });
 
     const last = steps[2];
-    expect(last.result.line).toBeNull();
+    // Three lines change; the step points at the new Team line and notes the other two.
+    expect(last.result).toMatchObject({ line: 18, before: null, after: 'team group    : Group Tech' });
     expect(last.result.note).toBeTruthy();
     expect(last.org.teams.get('group')).toMatchObject({ title: 'Group Tech', parent: null, placeholder: false });
     expect(last.org.teams.get('fintech')!.parent).toBe('group');

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { teamDepths, type Org } from '../core';
+import { teamChain, teamDepths, type Org } from '../core';
 
 const storageKey = (path: string) => `org-visualizer:collapsed:${path}`;
 
@@ -50,8 +50,7 @@ export function useCollapse(path: string | null, org: Org) {
   /** Expand every Collapsed team that contains the given Team, so it can be seen. */
   const expandTo = useCallback(
     (teamId: string | null) => {
-      const chain: string[] = [];
-      for (let t = teamId ? org.teams.get(teamId) : undefined; t; t = t.parent ? org.teams.get(t.parent) : undefined) chain.push(t.id);
+      const chain = teamChain(org, teamId).map((t) => t.id);
       setCollapsedState((prev) => (chain.some((id) => prev.has(id)) ? new Set([...prev].filter((id) => !chain.includes(id))) : prev));
     },
     [org],

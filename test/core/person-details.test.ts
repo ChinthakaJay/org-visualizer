@@ -74,9 +74,9 @@ describe('buildScene: Person details and Dotted lines', () => {
   });
 
   it('draws a Dotted line to a Placeholder Person', async () => {
-    const scene = await buildScene(parse(lines('pm : PM | dotted=lead, boss')));
+    const scene = await buildScene(parse(lines('pm : PM | dotted=lead, mentor')));
     expect(line(scene, 'lead', 'pm', 'dotted')).toBeDefined();
-    expect(line(scene, 'boss', 'pm', 'dotted')).toBeDefined();
+    expect(line(scene, 'mentor', 'pm', 'dotted')).toBeDefined();
     expect(card(scene, 'lead').placeholder).toBe(true);
   });
 });

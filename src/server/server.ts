@@ -47,13 +47,19 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     const text = await readFile(filePath, 'utf8');
     return { path: filePath, text, version: versionOf(text) };
   };
+  /** For reads and saves, a deleted Org file reads as empty, so a save over it shows up as a conflict. */
+  const readOrgOrEmpty = () =>
+    readOrg().catch((err) => {
+      if (err?.code !== 'ENOENT') throw err;
+      return { path: filePath, text: '', version: versionOf('') };
+    });
 
   /** The version last written by us or announced to clients, so our own saves aren't echoed as outside edits. */
   let knownVersion = (await readOrg()).version;
 
   /** Saves only if the file on disk is still the version the client last saw. */
   const save = async (text: string, baseVersion: string): Promise<[number, unknown]> => {
-    const current = await readOrg();
+    const current = await readOrgOrEmpty();
     if (current.version !== baseVersion) return [409, current];
     knownVersion = versionOf(text);
     await writeFile(filePath, text, 'utf8');
@@ -106,7 +112,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     const named = url.searchParams.get('path');
     if (named !== null && resolve(named) !== filePath) return send(res, 403, 'Only the Org file this server was started with is available');
 
-    if (url.pathname === '/api/file' && req.method === 'GET') return sendJson(res, 200, await readOrg());
+    if (url.pathname === '/api/file' && req.method === 'GET') return sendJson(res, 200, await readOrgOrEmpty());
     if (url.pathname === '/api/file' && req.method === 'PUT') {
       const body = await readJson(req);
       if (typeof body?.text !== 'string' || typeof body?.baseVersion !== 'string') return send(res, 400, 'Expected { text, baseVersion }');

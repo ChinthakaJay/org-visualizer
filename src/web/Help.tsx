@@ -21,8 +21,9 @@ export function Help({ onClose }: { onClose(): void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Esc in the search box closes its results, not Help.
-      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement)) onClose();
+      // Esc in the search box closes its results, and in the sandbox editor it belongs to the editor.
+      const inField = e.target instanceof HTMLInputElement || (e.target instanceof Element && e.target.closest('.cm-editor'));
+      if (e.key === 'Escape' && !inField) onClose();
     };
     window.addEventListener('keydown', onKey);
     dialog.current?.focus();
@@ -134,14 +135,16 @@ function Walkthroughs({ sandbox }: { sandbox: React.RefObject<WorkbenchHandle | 
 
 /** The exact line a step changed, before and after, or a note when it wasn't a single line. */
 function ChangeView({ change }: { change: StepResult }) {
-  if (change.line === null) {
-    return <div className="change" role="status"><span className="change-note">{change.note}</span></div>;
-  }
   return (
     <div className="change" role="status">
-      <div className="change-title">Line {change.line}</div>
-      {change.before !== null && <pre className="minus">- {change.before}</pre>}
-      <pre className="plus">+ {change.after}</pre>
+      {change.line !== null && (
+        <>
+          <div className="change-title">Line {change.line}</div>
+          {change.before !== null && <pre className="minus">- {change.before}</pre>}
+          <pre className="plus">+ {change.after}</pre>
+        </>
+      )}
+      {change.note && <div className="change-note">{change.note}</div>}
     </div>
   );
 }

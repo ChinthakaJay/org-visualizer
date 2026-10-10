@@ -1,6 +1,6 @@
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
 import { paletteHue, parseColour, type Hue, type TeamColour } from './colours';
-import type { Org, Person, Team } from './org';
+import { teamChain, type Org, type Person, type Team } from './org';
 
 export interface Point { x: number; y: number }
 export interface Rect { x: number; y: number; width: number; height: number }
@@ -108,21 +108,18 @@ export async function buildScene(
   const { teams, people } = org;
 
   const childTeams = new Map<string | null, Team[]>([[null, []]]);
-  const members = new Map<string | null, Person[]>([[null, []]]);
+  const peopleByTeam = new Map<string | null, Person[]>([[null, []]]);
   for (const t of teams.values()) {
     childTeams.set(t.id, []);
-    members.set(t.id, []);
+    peopleByTeam.set(t.id, []);
   }
   for (const t of teams.values()) childTeams.get(t.parent && teams.has(t.parent) ? t.parent : null)!.push(t);
-  for (const p of people.values()) members.get(p.team && teams.has(p.team) ? p.team : null)!.push(p);
+  for (const p of people.values()) peopleByTeam.get(p.team && teams.has(p.team) ? p.team : null)!.push(p);
 
   /** The outermost Collapsed team containing a Team (itself included), if any. */
   const collapsedAncestor = (teamId: string | null): string | null => {
-    let found: string | null = null;
-    for (let t = teamId ? teams.get(teamId) : undefined; t; t = t.parent ? teams.get(t.parent) : undefined) {
-      if (collapsed.has(t.id)) found = t.id;
-    }
-    return found;
+    const outermost = teamChain(org, teamId).filter((t) => collapsed.has(t.id)).pop();
+    return outermost?.id ?? null;
   };
   /** Where a line to this Person is drawn: their card, or the Collapsed team box hiding it. */
   const visibleEnd = (personId: string): { kind: EndKind; id: string } => {
@@ -131,7 +128,7 @@ export async function buildScene(
   };
 
   const contentCounts = (teamId: string): { people: number; teams: number } => {
-    const total = { people: members.get(teamId)!.length, teams: 0 };
+    const total = { people: peopleByTeam.get(teamId)!.length, teams: 0 };
     for (const sub of childTeams.get(teamId)!) {
       const inner = contentCounts(sub.id);
       total.people += inner.people;
@@ -151,13 +148,13 @@ export async function buildScene(
             'elk.nodeSize.constraints': 'MINIMUM_SIZE',
             'elk.nodeSize.minimum': `(${teamMinWidth(t)},${TEAM_HEADER + 24})`,
           },
-          children: [...members.get(t.id)!.map(personNode), ...childTeams.get(t.id)!.map(teamNode)],
+          children: [...peopleByTeam.get(t.id)!.map(personNode), ...childTeams.get(t.id)!.map(teamNode)],
         };
 
   const edges: ElkExtendedEdge[] = [];
   const lineEnds = new Map<string, Omit<SceneLine, 'points'>>();
   const seen = new Set<string>();
-  const addLine = (kind: SceneLine['kind'], fromPerson: string, toPerson: string) => {
+  const addSceneLine = (kind: SceneLine['kind'], fromPerson: string, toPerson: string) => {
     const from = visibleEnd(fromPerson);
     const to = visibleEnd(toPerson);
     if (from.kind === to.kind && from.id === to.id) return; // both ends hidden in the same Collapsed team
@@ -171,14 +168,14 @@ export async function buildScene(
     lineEnds.set(id, { kind, from: from.id, fromKind: from.kind, to: to.id, toKind: to.kind });
   };
   for (const p of people.values()) {
-    if (p.manager) addLine('reporting', p.manager, p.id);
-    for (const d of p.dotted) addLine('dotted', d, p.id);
+    if (p.manager) addSceneLine('reporting', p.manager, p.id);
+    for (const d of p.dotted) addSceneLine('dotted', d, p.id);
   }
 
   const graph: ElkNode = {
     id: 'root',
     layoutOptions: ROOT_OPTIONS,
-    children: [...members.get(null)!.map(personNode), ...childTeams.get(null)!.map(teamNode)],
+    children: [...peopleByTeam.get(null)!.map(personNode), ...childTeams.get(null)!.map(teamNode)],
     edges,
   };
   const laid = await engine.layout(graph);
