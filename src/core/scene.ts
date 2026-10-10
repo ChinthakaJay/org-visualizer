@@ -1,4 +1,5 @@
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
+import { paletteHue, parseColour, type Hue, type TeamColour } from './colours';
 import type { Org, Person, Team } from './org';
 
 export interface Point { x: number; y: number }
@@ -9,6 +10,8 @@ export interface TeamBox extends Rect {
   title: string;
   /** 0 for a top-level Team. */
   depth: number;
+  /** Null for a Placeholder Team, which is drawn neutral grey. */
+  colour: TeamColour | null;
   line: number | null;
   placeholder: boolean;
 }
@@ -18,6 +21,8 @@ export interface PersonCard extends Rect {
   name: string;
   role: string | null;
   fn: string | null;
+  /** The Team's colour, for a faint tint; null for a card outside every Team. */
+  tint: TeamColour | null;
   team: string | null;
   line: number | null;
   placeholder: boolean;
@@ -138,7 +143,8 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
   };
   const scene: Scene = { width: laid.width ?? 0, height: laid.height ?? 0, teams: [], people: [], lines: [], counts };
 
-  const walk = (node: ElkNode, offset: Point, depth: number) => {
+  const colours = new Map<string, TeamColour | null>();
+  const walk = (node: ElkNode, offset: Point, depth: number, inherited: Hue | null) => {
     for (const child of node.children ?? []) {
       const at = { x: offset.x + (child.x ?? 0), y: offset.y + (child.y ?? 0) };
       origin.set(child.id, at);
@@ -146,12 +152,15 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
       const [kind, id] = [child.id.slice(0, 1), child.id.slice(2)];
       if (kind === 't') {
         const t = teams.get(id)!;
-        scene.teams.push({ ...rect, id, title: t.title, depth, line: t.line, placeholder: t.placeholder });
-        walk(child, at, depth + 1);
+        const hue = (t.colour && parseColour(t.colour)) || inherited || paletteHue(id);
+        const colour = t.placeholder ? null : { ...hue, shade: depth };
+        colours.set(id, colour);
+        scene.teams.push({ ...rect, id, title: t.title, depth, colour, line: t.line, placeholder: t.placeholder });
+        walk(child, at, depth + 1, t.placeholder ? null : hue);
       } else {
         const p = people.get(id)!;
         scene.people.push({
-          ...rect, id, name: p.name, role: p.role, fn: p.fn, team: p.team, line: p.line, placeholder: p.placeholder,
+          ...rect, id, name: p.name, role: p.role, fn: p.fn, tint: (p.team && colours.get(p.team)) || null, team: p.team, line: p.line, placeholder: p.placeholder,
           tooltip: {
             id,
             team: p.team ? teams.get(p.team)?.title ?? p.team : null,
@@ -163,7 +172,7 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
       }
     }
   };
-  walk(laid, { x: 0, y: 0 }, 0);
+  walk(laid, { x: 0, y: 0 }, 0, null);
 
   for (const edge of laid.edges ?? []) {
     const container = (edge as ElkExtendedEdge & { container?: string }).container ?? 'root';

@@ -13,6 +13,8 @@ export interface Team {
   id: string;
   title: string;
   parent: string | null;
+  /** A valid `color=` override (a name or hex), inherited by sub-teams. */
+  colour: string | null;
   /** 1-based line that defines the Team; null for a Placeholder. */
   line: number | null;
   placeholder: boolean;

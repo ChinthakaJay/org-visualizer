@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { PersonCard, Point, Scene, SceneLine, TeamBox } from '../core';
+import type { PersonCard, Point, Scene, SceneLine, TeamBox, TeamColour } from '../core';
 import { TEAM_HEADER } from '../core';
+import { CHART_CSS } from './chartStyles';
 
 interface ChartProps {
   scene: Scene;
@@ -26,6 +27,7 @@ export function Chart({ scene }: ChartProps) {
         viewBox={`0 0 ${scene.width} ${scene.height}`}
       >
         <defs>
+          <style>{CHART_CSS}</style>
           <marker id="arrow-reporting" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
             <path d="M0,0 L10,5 L0,10 z" className="arrow-head reporting" />
           </marker>
@@ -50,7 +52,7 @@ export function Chart({ scene }: ChartProps) {
 
 function TeamBoxView({ team }: { team: TeamBox }) {
   return (
-    <g className={`team depth-${Math.min(team.depth, 4)}${team.placeholder ? ' placeholder' : ''}`} data-team={team.id}>
+    <g className={`team${team.placeholder ? ' placeholder' : ''}`} data-team={team.id} style={colourVars(team.colour)}>
       <rect className="team-box" x={team.x} y={team.y} width={team.width} height={team.height} rx={10} />
       <text className="team-title" x={team.x + 12} y={team.y + TEAM_HEADER / 2 + 5}>
         {team.title}
@@ -70,6 +72,7 @@ function PersonCardView({ person, onHover }: { person: PersonCard; onHover(e: Re
     <g
       className={`card${person.placeholder ? ' placeholder' : ''}`}
       data-person={person.id}
+      style={colourVars(person.tint)}
       onMouseMove={onHover}
       onMouseLeave={() => onHover(null)}
     >
@@ -127,6 +130,14 @@ function tooltipPosition(x: number, y: number): React.CSSProperties {
     ...(flipX ? { right: window.innerWidth - x + 14 } : { left: x + 14 }),
     ...(flipY ? { bottom: window.innerHeight - y + 14 } : { top: y + 14 }),
   };
+}
+
+const MAX_SHADE = 4;
+
+/** Team colour as the custom properties the chart styles read. */
+function colourVars(colour: TeamColour | null): React.CSSProperties | undefined {
+  if (!colour) return undefined;
+  return { '--h': colour.hue, '--s': colour.saturation, '--shade': Math.min(colour.shade, MAX_SHADE) } as React.CSSProperties;
 }
 
 const pathOf = (points: Point[]) => points.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ');

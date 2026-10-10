@@ -1,3 +1,4 @@
+import { COLOUR_NAMES, parseColour } from './colours';
 import type { Org, Person, Problem, Team } from './org';
 
 const ID = /^[A-Za-z_][\w.-]*$/;
@@ -38,7 +39,12 @@ export function parse(text: string): Org {
     }
 
     if (teamKeyword) {
-      teams.set(id, { id, title: name, parent: attrs.parent || null, line, placeholder: false });
+      let colour = attrs.color || attrs.colour || null;
+      if (colour && !parseColour(colour)) {
+        problems.push({ severity: 'warning', line, message: `Unknown colour "${colour}". Use #rrggbb or one of: ${COLOUR_NAMES.join(', ')}` });
+        colour = null;
+      }
+      teams.set(id, { id, title: name, parent: attrs.parent || null, colour, line, placeholder: false });
     } else {
       const manager = attrs.reports && attrs.reports !== '?' ? attrs.reports : null;
       const dotted = [...new Set((attrs.dotted ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
@@ -58,7 +64,7 @@ export function parse(text: string): Org {
 /** Create Placeholders for unknown ids, cut Team loops, and flag impossible Reporting lines. */
 function resolve(teams: Map<string, Team>, people: Map<string, Person>, problems: Problem[]) {
   const placeholderTeam = (id: string, why: string, line: number) => {
-    if (!teams.has(id)) teams.set(id, { id, title: id, parent: null, line: null, placeholder: true });
+    if (!teams.has(id)) teams.set(id, { id, title: id, parent: null, colour: null, line: null, placeholder: true });
     if (teams.get(id)!.placeholder) {
       problems.push({ severity: 'info', line, message: `Team "${id}" isn't defined (${why}), so it's drawn as a dashed Placeholder` });
     }
