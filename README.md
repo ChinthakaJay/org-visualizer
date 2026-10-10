@@ -15,11 +15,13 @@ A missing file is created from a short commented template, and Help opens to sho
 ## The Org file
 
 ```
-team fintech  : FinTech
+team fintech : FinTech
 team payments : Payments | parent=fintech | color=purple
-bob   : Bob Jones   | team=fintech  | role=Director | fn=eng
+bob : Bob Jones | team=fintech | role=Director | fn=eng
 alice : Alice Smith | team=payments | reports=bob | dotted=carol | met=2024 offsite
 ```
+
+The editor has **Find** (⌘F / Ctrl+F, with Replace in the same panel) and **Format** (⇧⌥F / Shift+Alt+F), which tidies the spacing of every line without changing what the file says.
 
 Help (top right) has the full syntax reference, keyboard and mouse controls, and walkthroughs.
 

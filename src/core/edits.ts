@@ -48,7 +48,7 @@ export function setField(text: string, kind: 'person' | 'team', id: string, key:
     const pad = m[3].length === 0 ? '' : ' '.repeat(Math.max(1, width - value.length));
     after = body.replace(fieldRe, `$1${value}${pad}`) + comment;
   } else {
-    after = body.replace(/\s*$/, ` | ${key}=${value}`) + (comment ? `  ${comment.trimStart()}` : '');
+    after = body.replace(/\s*$/, ` | ${key}=${value}`) + (comment ? ` ${comment.trimStart()}` : '');
   }
   lines[i] = after;
   return { text: lines.join('\n'), line: i + 1, before, after };

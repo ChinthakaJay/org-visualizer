@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parse, SAMPLE, setField, WALKTHROUGHS, type Org, type StepResult } from '../../src/core';
+import { format, parse, SAMPLE, setField, WALKTHROUGHS, type Org, type StepResult } from '../../src/core';
 
 /** Runs every step of a walkthrough from the sample, returning each step's result and Org. */
 function play(name: string) {
@@ -43,7 +43,7 @@ describe('walkthroughs', () => {
     const [step] = play('New Manager');
     expect(step.result).toMatchObject({
       line: 11,
-      before: 'alice : Alice Smith | team=payments | reports=bob   | role=EM | fn=eng',
+      before: 'alice : Alice Smith | team=payments | reports=bob | role=EM | fn=eng',
       after: 'alice : Alice Smith | team=payments | reports=carol | role=EM | fn=eng',
     });
     expect(step.org.people.get('alice')).toMatchObject({ manager: 'carol', team: 'payments' });
@@ -53,22 +53,22 @@ describe('walkthroughs', () => {
     const [step] = play('Person changes Team');
     expect(step.result).toMatchObject({
       line: 15,
-      after: 'eve   : Eve Park    | team=payments | reports=frank   # frank not listed yet',
+      after: 'eve : Eve Park | team=payments | reports=frank # frank not listed yet',
     });
     expect(step.org.people.get('eve')).toMatchObject({ team: 'payments', manager: 'frank' });
   });
 
   it('Team re-org: whole Teams move by editing only Team lines', () => {
     const steps = play('Team re-org');
-    expect(steps[0].result).toMatchObject({ line: 7, after: 'team cards    : Cards     | parent=platform' });
+    expect(steps[0].result).toMatchObject({ line: 7, after: 'team cards : Cards | parent=platform' });
     expect(steps[0].org.teams.get('cards')!.parent).toBe('platform');
     expect(steps[0].org.people.get('dan')!.team).toBe('cards');
 
-    expect(steps[1].result).toMatchObject({ line: 6, after: 'team risk     : Risk      | parent=payments' });
+    expect(steps[1].result).toMatchObject({ line: 6, after: 'team risk : Risk | parent=payments' });
 
     const last = steps[2];
     // Three lines change; the step points at the new Team line and notes the other two.
-    expect(last.result).toMatchObject({ line: 18, before: null, after: 'team group    : Group Tech' });
+    expect(last.result).toMatchObject({ line: 18, before: null, after: 'team group : Group Tech' });
     expect(last.result.note).toBeTruthy();
     expect(last.org.teams.get('group')).toMatchObject({ title: 'Group Tech', parent: null, placeholder: false });
     expect(last.org.teams.get('fintech')!.parent).toBe('group');
@@ -81,7 +81,7 @@ describe('walkthroughs', () => {
 
   it('Partial knowledge: Placeholders appear, then become real as their lines are added', () => {
     const steps = play('Partial knowledge');
-    expect(steps[0].result).toMatchObject({ before: null, after: 'ivy   : Ivy Chen    | team=ml | reports=kai' });
+    expect(steps[0].result).toMatchObject({ before: null, after: 'ivy : Ivy Chen | team=ml | reports=kai' });
     expect(placeholders(steps[0].org)).toEqual(['frank', 'kai', 'ml']);
     expect(placeholders(steps[1].org)).toEqual(['frank', 'ml']);
     expect(placeholders(steps[2].org)).toEqual(['frank']);
@@ -109,7 +109,7 @@ describe('walkthroughs', () => {
 
   it('Dotted line: Gia gets Dotted lines to Carol, then to a new VP too, keeping her Manager', () => {
     const steps = play('Dotted line');
-    expect(steps[0].result.after).toBe('gia   : Gia Lam     | team=cards    | reports=alice | role=PM | fn=product | dotted=carol');
+    expect(steps[0].result.after).toBe('gia : Gia Lam | team=cards | reports=alice | role=PM | fn=product | dotted=carol');
     expect(steps[0].org.people.get('gia')).toMatchObject({ manager: 'alice', dotted: ['carol'] });
     const last = steps[steps.length - 1].org;
     expect(last.people.get('gia')!.dotted).toEqual(['carol', 'vp']);
@@ -118,18 +118,28 @@ describe('walkthroughs', () => {
 
   it('Function: Functions are set and changed with one edit each', () => {
     const steps = play('Function');
-    expect(steps[0].result.after).toBe('hal   : Hal Ng      | team=platform | reports=carol | fn=ops  # reports across teams');
+    expect(steps[0].result.after).toBe('hal : Hal Ng | team=platform | reports=carol | fn=ops # reports across teams');
     expect(steps[0].org.people.get('hal')!.fn).toBe('ops');
-    expect(steps[1].result.after).toBe('dan   : Dan Ruiz    | team=cards    | reports=alice | fn=data');
+    expect(steps[1].result.after).toBe('dan : Dan Ruiz | team=cards | reports=alice | fn=data');
     expect(steps[1].org.people.get('dan')!.fn).toBe('data');
   });
 
   it('Team colour: a colour on a Team is inherited by its sub-teams, and can be overridden lower down', () => {
     const steps = play('Team colour');
-    expect(steps[0].result.after).toBe('team fintech  : FinTech | color=purple');
+    expect(steps[0].result.after).toBe('team fintech : FinTech | color=purple');
     expect(steps[0].org.teams.get('fintech')!.colour).toBe('purple');
-    expect(steps[1].result.after).toBe('team cards    : Cards     | parent=payments | color=#e11d48');
+    expect(steps[1].result.after).toBe('team cards : Cards | parent=payments | color=#e11d48');
     expect(steps[1].org.problems).toMatchObject([{ severity: 'info' }]);
+  });
+
+  it('only ever writes formatted lines', () => {
+    for (const w of WALKTHROUGHS) {
+      let text = SAMPLE;
+      for (const step of w.steps) {
+        text = step.run(text).text;
+        expect(format(text), `${w.name}: ${step.label}`).toBe(text);
+      }
+    }
   });
 
   it('Collapse and expand: steps change the view, never the file', () => {
@@ -151,7 +161,7 @@ describe('setField', () => {
 
   it('adds a missing field before a trailing comment', () => {
     const r = setField('a : A   # note\n', 'person', 'a', 'fn', 'eng');
-    expect(r).toMatchObject({ line: 1, before: 'a : A   # note', after: 'a : A | fn=eng  # note' });
+    expect(r).toMatchObject({ line: 1, before: 'a : A   # note', after: 'a : A | fn=eng # note' });
   });
 
   it('finds Teams and People by exact id, even with dots and dashes', () => {

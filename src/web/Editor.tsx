@@ -1,6 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { lintGutter, setDiagnostics, type Diagnostic } from '@codemirror/lint';
-import { EditorState } from '@codemirror/state';
+import { highlightSelectionMatches, openSearchPanel, search, searchKeymap } from '@codemirror/search';
+import { EditorState, type ChangeSpec } from '@codemirror/state';
 import {
   EditorView,
   drawSelection,
@@ -10,7 +11,7 @@ import {
   lineNumbers,
 } from '@codemirror/view';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import type { Problem } from '../core';
+import { format, type Problem } from '../core';
 import { orgFileSyntax } from './orgLanguage';
 
 export interface EditorHandle {
@@ -24,6 +25,35 @@ export interface EditorHandle {
    * cursor at the end of a 1-based line and select it if asked.
    */
   applyEdit(text: string, line: number | null, options?: { select?: boolean }): void;
+}
+
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+const FIND_KEYS = isMac ? '⌘F' : 'Ctrl+F';
+const FORMAT_KEYS = isMac ? '⇧⌥F' : 'Shift+Alt+F';
+
+/** The smallest change that turns old into text: the differing middle, after any shared start and end. */
+function minimalChange(old: string, text: string, offset = 0): ChangeSpec {
+  let start = 0;
+  while (start < old.length && start < text.length && old[start] === text[start]) start++;
+  let end = 0;
+  while (end < old.length - start && end < text.length - start && old[old.length - 1 - end] === text[text.length - 1 - end]) end++;
+  return { from: offset + start, to: offset + old.length - end, insert: text.slice(start, text.length - end) };
+}
+
+/**
+ * Format the whole Org file as one undoable edit. Format never adds or removes lines, so each
+ * changed line gets its own small change and the cursor stays where it was in its line.
+ */
+function formatDocument(view: EditorView): boolean {
+  const { doc } = view.state;
+  const next = format(doc.toString()).split('\n');
+  const changes: ChangeSpec[] = [];
+  for (let i = 1; i <= doc.lines; i++) {
+    const line = doc.line(i);
+    if (line.text !== next[i - 1]) changes.push(minimalChange(line.text, next[i - 1], line.from));
+  }
+  if (changes.length) view.dispatch({ changes, userEvent: 'format' });
+  return true;
 }
 
 interface EditorProps {
@@ -55,8 +85,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
           highlightActiveLineGutter(),
           highlightActiveLine(),
           drawSelection(),
+          highlightSelectionMatches(),
+          search({ top: true }),
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([{ key: 'Shift-Alt-f', run: formatDocument, preventDefault: true }, ...searchKeymap, ...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) handlers.current.onChange?.(u.state.doc.toString());
             if (u.docChanged || u.selectionSet) {
@@ -102,13 +134,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
     },
     applyEdit(text, n, { select = false } = {}) {
       const v = view.current!;
-      const old = v.state.doc.toString();
       // Replace only the part that differs, so undo and the cursor behave naturally.
-      let start = 0;
-      while (start < old.length && start < text.length && old[start] === text[start]) start++;
-      let end = 0;
-      while (end < old.length - start && end < text.length - start && old[old.length - 1 - end] === text[text.length - 1 - end]) end++;
-      v.dispatch({ changes: { from: start, to: old.length - end, insert: text.slice(start, text.length - end) } });
+      v.dispatch({ changes: minimalChange(v.state.doc.toString(), text) });
       if (n !== null) {
         const line = v.state.doc.line(Math.max(1, Math.min(n, v.state.doc.lines)));
         // A selected line is selected backwards, so a long line scrolls to its start, not its end.
@@ -124,5 +151,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
     },
   }), []);
 
-  return <div className="editor" ref={host} />;
+  return (
+    <>
+      <div className="toolbar editor-toolbar" role="toolbar" aria-label="Editor">
+        <button title={`Find and replace (${FIND_KEYS})`} onClick={() => openSearchPanel(view.current!)}>Find</button>
+        <button
+          title={`Tidy the spacing of every line (${FORMAT_KEYS})`}
+          onClick={() => {
+            formatDocument(view.current!);
+            view.current!.focus();
+          }}
+        >
+          Format
+        </button>
+      </div>
+      <div className="editor" ref={host} />
+    </>
+  );
 });

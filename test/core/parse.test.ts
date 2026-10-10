@@ -17,6 +17,13 @@ describe('parse: basic Team and Person lines', () => {
     expect(org.problems).toEqual([]);
   });
 
+  it('reads a line with no spaces around the colon', () => {
+    const org = parse('team payments:Payments|parent=fintech\ndan:Dan|team=payments\n');
+    expect(org.teams.get('payments')).toMatchObject({ title: 'Payments', parent: 'fintech' });
+    expect(org.people.get('dan')).toMatchObject({ name: 'Dan', team: 'payments' });
+    expect(org.problems.filter((p) => p.severity === 'error')).toEqual([]);
+  });
+
   it('uses the id as the name when no name is given', () => {
     const org = parse('kai\n');
     expect(org.people.get('kai')).toMatchObject({ name: 'kai' });

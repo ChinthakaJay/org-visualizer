@@ -1,7 +1,9 @@
 import { COLOUR_NAMES, parseColour } from './colours';
 import type { Org, Person, Problem, Team } from './org';
 
-const ID = /^[A-Za-z_][\w.-]*$/;
+export const ID = /^[A-Za-z_][\w.-]*$/;
+/** A line's head: `[team] <id> [: <Name>]`. The id stops at a colon, so `payments:Payments` reads too. */
+export const HEAD = /^(?:(team)\s+)?([^\s:]+)\s*(?::\s*(.*))?$/;
 const PERSON_KEYS = new Set(['team', 'reports', 'dotted', 'role', 'fn']);
 
 /** Parse Org file text into Teams, People and Problems. Lines may come in any order. */
@@ -24,7 +26,7 @@ export function parse(text: string): Org {
       else problems.push({ severity: 'error', line, message: `"${field}" isn't key=value` });
     }
 
-    const m = head.match(/^(?:(team)\s+)?(\S+)\s*(?::\s*(.*))?$/);
+    const m = head.match(HEAD);
     if (!m || !ID.test(m[2])) {
       problems.push({ severity: 'error', line, message: `Can't read "${head}". Expected "<id> : <Name>" or "team <id> : <Title>"` });
       return;
