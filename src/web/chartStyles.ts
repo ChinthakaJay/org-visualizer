@@ -8,9 +8,10 @@
 export const CHART_CSS = `
 .chart-svg {
   --c-ink: #1d1d1f; --c-muted: #6b6b70; --c-panel: #ffffff; --c-line: #5b6474; --c-dotted: #2f6fdf;
-  --c-highlight: #f59e0b;
+  --c-highlight: #f59e0b; --c-bg: #f6f6f4;
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+.chart-svg .chart-bg { fill: var(--c-bg); }
 .chart-svg .team, .chart-svg .card { --h: 0; --s: 0; --shade: 0; }
 
 .chart-svg .team-box {
@@ -43,7 +44,7 @@ export const CHART_CSS = `
 @media (prefers-color-scheme: dark) {
   .chart-svg {
     --c-ink: #ececee; --c-muted: #a1a1aa; --c-panel: #1d1d20; --c-line: #9aa3b2; --c-dotted: #7aa7ff;
-    --c-highlight: #fbbf24;
+    --c-highlight: #fbbf24; --c-bg: #151517;
   }
   .chart-svg .team-box {
     fill: hsl(var(--h) calc(var(--s) * 0.32%) calc(14% + var(--shade) * 3.5%));

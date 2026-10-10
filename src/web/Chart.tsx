@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { forwardRef, memo, useState } from 'react';
 import type { PersonCard, Point, Scene, SceneLine, TeamBox, TeamColour } from '../core';
 import { TEAM_HEADER } from '../core';
 import { CHART_CSS } from './chartStyles';
 
 interface ChartProps {
   scene: Scene;
+  /** The viewport's pan and zoom, as an SVG transform. */
+  transform: string;
 }
 
 interface Hover {
@@ -14,18 +16,11 @@ interface Hover {
 }
 
 /** Draws a scene as SVG: Team boxes parent-first, then lines, then person cards on top. */
-export function Chart({ scene }: ChartProps) {
+export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform }, ref) {
   const [hover, setHover] = useState<Hover | null>(null);
-
   return (
     <>
-      <svg
-        className="chart-svg"
-        xmlns="http://www.w3.org/2000/svg"
-        width={scene.width}
-        height={scene.height}
-        viewBox={`0 0 ${scene.width} ${scene.height}`}
-      >
+      <svg ref={ref} className="chart-svg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
         <defs>
           <style>{CHART_CSS}</style>
           <marker id="arrow-reporting" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -35,20 +30,27 @@ export function Chart({ scene }: ChartProps) {
             <path d="M1,1 L9,5 L1,9" className="arrow-head dotted" />
           </marker>
         </defs>
-        {scene.teams.map((t) => <TeamBoxView key={t.id} team={t} />)}
-        {scene.lines.map((l, i) => <LineView key={i} line={l} />)}
-        {scene.people.map((p) => (
-          <PersonCardView
-            key={p.id}
-            person={p}
-            onHover={(e) => setHover(e && { person: p, x: e.clientX, y: e.clientY })}
-          />
-        ))}
+        <g className="viewport-transform" transform={transform}>
+          <SceneContent scene={scene} onHover={setHover} />
+        </g>
       </svg>
       {hover && <Tooltip {...hover} />}
     </>
   );
-}
+});
+
+/** The drawing itself; memoised so panning and zooming only touch the transform. */
+const SceneContent = memo(function SceneContent({ scene, onHover }: { scene: Scene; onHover(h: Hover | null): void }) {
+  return (
+    <>
+      {scene.teams.map((t) => <TeamBoxView key={t.id} team={t} />)}
+      {scene.lines.map((l, i) => <LineView key={i} line={l} />)}
+      {scene.people.map((p) => (
+        <PersonCardView key={p.id} person={p} onHover={(e) => onHover(e && { person: p, x: e.clientX, y: e.clientY })} />
+      ))}
+    </>
+  );
+});
 
 function TeamBoxView({ team }: { team: TeamBox }) {
   return (

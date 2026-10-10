@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
-import { Chart } from './Chart';
+import { ChartView, type ChartHandle } from './ChartView';
 import { Editor, type EditorHandle } from './Editor';
 import { ProblemsPanel } from './ProblemsPanel';
 import { useAutosave, type SaveState } from './useAutosave';
@@ -21,6 +21,7 @@ export function App() {
 
 function Workspace({ file }: { file: OrgFile }) {
   const editor = useRef<EditorHandle>(null);
+  const chart = useRef<ChartHandle>(null);
   const [text, setText] = useState(file.text);
   const { org, scene, stale } = useScene(text);
   /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
@@ -79,8 +80,7 @@ function Workspace({ file }: { file: OrgFile }) {
           <ProblemsPanel problems={org.problems} onJump={(line) => editor.current?.goToLine(line)} />
         </section>
         <section className="pane chart-pane">
-          {stale && <div className="stale-badge" role="status">Couldn't redraw. Showing the last good chart.</div>}
-          <div className={`chart-viewport${stale ? ' stale' : ''}`}>{scene && <Chart scene={scene} />}</div>
+          <ChartView ref={chart} scene={scene} stale={stale} exportName={exportName(file.path)} />
         </section>
       </main>
       <footer className="status-bar">
@@ -95,6 +95,9 @@ function Workspace({ file }: { file: OrgFile }) {
     </div>
   );
 }
+
+/** "team-org.txt" → "team-org.svg" */
+const exportName = (path: string) => (path.split(/[\\/]/).pop() ?? 'org').replace(/\.[^.]*$/, '') + '.svg';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
