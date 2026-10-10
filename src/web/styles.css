@@ -75,8 +75,26 @@ button, input, select { font: inherit; color: inherit; }
 .card-name { font-size: 13px; font-weight: 600; fill: var(--ink); }
 .card.placeholder .card-box { stroke-dasharray: 5 4; fill: transparent; }
 .card.placeholder .card-name { fill: var(--muted); }
-.line { fill: none; stroke: color-mix(in srgb, var(--ink) 55%, transparent); stroke-width: 1.5; }
-.arrow-head { fill: color-mix(in srgb, var(--ink) 55%, transparent); }
+.card-role { font-size: 12px; fill: var(--muted); }
+.fn-badge rect { fill: color-mix(in srgb, var(--ink) 9%, transparent); }
+.fn-badge text { font-size: 10.5px; font-weight: 600; fill: var(--muted); letter-spacing: 0.02em; }
+.line { fill: none; stroke-width: 1.5; }
+.line.reporting { stroke: color-mix(in srgb, var(--ink) 55%, transparent); }
+.line.dotted { stroke: var(--accent); stroke-dasharray: 5 4; stroke-width: 1.4; }
+.arrow-head.reporting { fill: color-mix(in srgb, var(--ink) 55%, transparent); }
+.arrow-head.dotted { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+
+.tooltip {
+  position: fixed; z-index: 50; pointer-events: none; max-width: 300px;
+  padding: 8px 10px; border-radius: 8px; font-size: 12px;
+  background: var(--panel); border: 1px solid var(--rule); box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
+}
+.tooltip-title { font-weight: 600; font-size: 13px; }
+.tooltip-role { color: var(--muted); margin-bottom: 4px; }
+.tooltip dl { margin: 4px 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 2px 10px; }
+.tooltip dl > div { display: contents; }
+.tooltip dt { color: var(--muted); }
+.tooltip dd { margin: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 860px) {
   .panes { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }

@@ -16,18 +16,28 @@ export interface TeamBox extends Rect {
 export interface PersonCard extends Rect {
   id: string;
   name: string;
+  role: string | null;
+  fn: string | null;
   team: string | null;
   line: number | null;
   placeholder: boolean;
+  /** Details shown on hover. Team and Manager are display names. */
+  tooltip: {
+    id: string;
+    team: string | null;
+    manager: string | null;
+    line: number | null;
+    extra: Record<string, string>;
+  };
 }
 
 export interface SceneLine {
-  kind: 'reporting';
-  /** Manager id. */
+  kind: 'reporting' | 'dotted';
+  /** The Manager, or the other end of a Dotted line. */
   from: string;
-  /** Report id. */
+  /** The report. */
   to: string;
-  /** Routed polyline in scene coordinates, from the Manager's end to the report's end. */
+  /** Routed polyline in scene coordinates, from the `from` end to the `to` end. */
   points: Point[];
 }
 
@@ -97,12 +107,18 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
   });
 
   const edges: ElkExtendedEdge[] = [];
-  const lineEnds = new Map<string, { from: string; to: string }>();
-  for (const p of people.values()) {
-    if (!p.manager || !people.has(p.manager)) continue;
+  const lineEnds = new Map<string, Omit<SceneLine, 'points'>>();
+  const addLine = (kind: SceneLine['kind'], from: string, to: string) => {
+    if (!people.has(from)) return;
     const id = `e${edges.length}`;
-    edges.push({ id, sources: [personNodeId(p.manager)], targets: [personNodeId(p.id)] });
-    lineEnds.set(id, { from: p.manager, to: p.id });
+    // Reporting lines decide the top-down order; Dotted lines bend to fit around them.
+    const layoutOptions = { 'elk.layered.priority.direction': kind === 'reporting' ? '10' : '0' };
+    edges.push({ id, sources: [personNodeId(from)], targets: [personNodeId(to)], layoutOptions });
+    lineEnds.set(id, { kind, from, to });
+  };
+  for (const p of people.values()) {
+    if (p.manager) addLine('reporting', p.manager, p.id);
+    for (const d of p.dotted) addLine('dotted', d, p.id);
   }
 
   const graph: ElkNode = {
@@ -134,7 +150,16 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
         walk(child, at, depth + 1);
       } else {
         const p = people.get(id)!;
-        scene.people.push({ ...rect, id, name: p.name, team: p.team, line: p.line, placeholder: p.placeholder });
+        scene.people.push({
+          ...rect, id, name: p.name, role: p.role, fn: p.fn, team: p.team, line: p.line, placeholder: p.placeholder,
+          tooltip: {
+            id,
+            team: p.team ? teams.get(p.team)?.title ?? p.team : null,
+            manager: p.manager ? people.get(p.manager)?.name ?? p.manager : null,
+            line: p.line,
+            extra: p.extra,
+          },
+        });
       }
     }
   };
@@ -145,7 +170,7 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
     const o = origin.get(container) ?? { x: 0, y: 0 };
     const shift = (p: Point) => ({ x: p.x + o.x, y: p.y + o.y });
     const points = (edge.sections ?? []).flatMap((s) => [s.startPoint, ...(s.bendPoints ?? []), s.endPoint].map(shift));
-    scene.lines.push({ kind: 'reporting', ...lineEnds.get(edge.id)!, points });
+    scene.lines.push({ ...lineEnds.get(edge.id)!, points });
   }
 
   return scene;

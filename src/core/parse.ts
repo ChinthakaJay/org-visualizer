@@ -1,6 +1,7 @@
 import type { Org, Person, Problem, Team } from './org';
 
 const ID = /^[A-Za-z_][\w.-]*$/;
+const PERSON_KEYS = new Set(['team', 'reports', 'dotted', 'role', 'fn']);
 
 /** Parse Org file text into Teams, People and Problems. Lines may come in any order. */
 export function parse(text: string): Org {
@@ -40,7 +41,12 @@ export function parse(text: string): Org {
       teams.set(id, { id, title: name, parent: attrs.parent || null, line, placeholder: false });
     } else {
       const manager = attrs.reports && attrs.reports !== '?' ? attrs.reports : null;
-      people.set(id, { id, name, team: attrs.team || null, manager, line, placeholder: false });
+      const dotted = [...new Set((attrs.dotted ?? '').split(',').map((s) => s.trim()).filter(Boolean))];
+      const extra = Object.fromEntries(Object.entries(attrs).filter(([key]) => !PERSON_KEYS.has(key)));
+      people.set(id, {
+        id, name, team: attrs.team || null, manager, dotted,
+        role: attrs.role || null, fn: attrs.fn || null, extra, line, placeholder: false,
+      });
     }
   });
 
@@ -58,7 +64,9 @@ function resolve(teams: Map<string, Team>, people: Map<string, Person>, problems
     }
   };
   const placeholderPerson = (id: string, why: string, line: number) => {
-    if (!people.has(id)) people.set(id, { id, name: id, team: null, manager: null, line: null, placeholder: true });
+    if (!people.has(id)) {
+      people.set(id, { id, name: id, team: null, manager: null, dotted: [], role: null, fn: null, extra: {}, line: null, placeholder: true });
+    }
     if (people.get(id)!.placeholder) {
       problems.push({ severity: 'info', line, message: `${why} "${id}" isn't listed yet, so they're drawn as a dashed Placeholder` });
     }
@@ -94,6 +102,11 @@ function resolve(teams: Map<string, Team>, people: Map<string, Person>, problems
     } else if (p.manager) {
       placeholderPerson(p.manager, 'Manager', p.line!);
     }
+    if (p.dotted.includes(p.id)) {
+      problems.push({ severity: 'error', line: p.line!, message: `${p.id} has a Dotted line to themselves; it is dropped` });
+      p.dotted = p.dotted.filter((d) => d !== p.id);
+    }
+    for (const d of p.dotted) placeholderPerson(d, 'Dotted-line contact', p.line!);
   }
 
   const loopsSeen = new Set<string>();

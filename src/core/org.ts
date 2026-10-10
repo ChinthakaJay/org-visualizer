@@ -23,6 +23,14 @@ export interface Person {
   name: string;
   team: string | null;
   manager: string | null;
+  /** Ids of People this Person has a Dotted line to. */
+  dotted: string[];
+  /** Free-text job title. */
+  role: string | null;
+  /** The kind of work, open-ended (eng, product, ops…). */
+  fn: string | null;
+  /** Any other key=value notes, shown only in the tooltip. */
+  extra: Record<string, string>;
   /** 1-based line that defines the Person; null for a Placeholder. */
   line: number | null;
   placeholder: boolean;
