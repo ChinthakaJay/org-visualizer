@@ -13,6 +13,8 @@ interface ChartProps {
   onSelectLine?(line: number): void;
   /** The element to highlight, as "person:<id>" or "team:<id>". */
   highlight?: string | null;
+  /** "+ Define" on a Placeholder Person or Team. */
+  onDefine?(kind: 'person' | 'team', id: string): void;
 }
 
 interface Hover {
@@ -22,7 +24,7 @@ interface Hover {
 }
 
 /** Draws a scene as SVG: Team boxes parent-first, then lines, then person cards on top. */
-export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform, onToggleTeam, onSelectLine, highlight = null }, ref) {
+export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform, onToggleTeam, onSelectLine, onDefine, highlight = null }, ref) {
   const [hover, setHover] = useState<Hover | null>(null);
   return (
     <>
@@ -42,6 +44,7 @@ export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scen
             onHover={setHover}
             onToggleTeam={onToggleTeam}
             onSelectLine={onSelectLine}
+            onDefine={onDefine}
             highlight={highlight}
           />
         </g>
@@ -57,10 +60,11 @@ interface SceneContentProps {
   onHover(h: Hover | null): void;
   onToggleTeam?(id: string): void;
   onSelectLine?(line: number): void;
+  onDefine?(kind: 'person' | 'team', id: string): void;
   highlight: string | null;
 }
 
-const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam, onSelectLine, highlight }: SceneContentProps) {
+const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam, onSelectLine, onDefine, highlight }: SceneContentProps) {
   return (
     <>
       {scene.teams.map((t) => (
@@ -69,6 +73,7 @@ const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam, 
           team={t}
           onToggle={onToggleTeam}
           onSelectLine={onSelectLine}
+          onDefine={onDefine}
           highlighted={highlight === `team:${t.id}`}
         />
       ))}
@@ -79,6 +84,7 @@ const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam, 
           person={p}
           highlighted={highlight === `person:${p.id}`}
           onSelectLine={onSelectLine}
+          onDefine={onDefine}
           onHover={(e) => onHover(e && { person: p, x: e.clientX, y: e.clientY })}
         />
       ))}
@@ -91,9 +97,10 @@ interface TeamBoxViewProps {
   highlighted: boolean;
   onToggle?(id: string): void;
   onSelectLine?(line: number): void;
+  onDefine?(kind: 'person' | 'team', id: string): void;
 }
 
-function TeamBoxView({ team, highlighted, onToggle, onSelectLine }: TeamBoxViewProps) {
+function TeamBoxView({ team, highlighted, onToggle, onSelectLine, onDefine }: TeamBoxViewProps) {
   const { x, y, width, height } = team;
   const toggle = onToggle && (() => onToggle(team.id));
   const label = `${team.collapsed ? 'Expand' : 'Collapse'} ${team.title}`;
@@ -144,6 +151,35 @@ function TeamBoxView({ team, highlighted, onToggle, onSelectLine }: TeamBoxViewP
           {team.counts.teams > 0 && ` · ${countLabel(team.counts.teams, 'sub-team', 'sub-teams')}`}
         </text>
       )}
+      {team.placeholder && onDefine && (
+        <DefineButton x={x + width - 76} y={y + 8} label={`Define Team ${team.id}`} onClick={() => onDefine('team', team.id)} />
+      )}
+    </g>
+  );
+}
+
+/** The "+ Define" action on a Placeholder: adds a stub line for it to the Org file. */
+function DefineButton({ x, y, label, onClick }: { x: number; y: number; label: string; onClick(): void }) {
+  return (
+    <g
+      className="define-button"
+      role="button"
+      tabIndex={0}
+      aria-label={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      <title>{label}: add a line for it to the Org file</title>
+      <rect x={x} y={y} width={66} height={20} rx={10} />
+      <text x={x + 33} y={y + 14} textAnchor="middle">+ Define</text>
     </g>
   );
 }
@@ -156,10 +192,11 @@ interface PersonCardViewProps {
   person: PersonCard;
   highlighted: boolean;
   onSelectLine?(line: number): void;
+  onDefine?(kind: 'person' | 'team', id: string): void;
   onHover(e: React.MouseEvent | null): void;
 }
 
-function PersonCardView({ person, highlighted, onSelectLine, onHover }: PersonCardViewProps) {
+function PersonCardView({ person, highlighted, onSelectLine, onDefine, onHover }: PersonCardViewProps) {
   const { x, y, width, height } = person;
   const fn = person.fn ? clip(person.fn, 12) : null;
   const badgeWidth = fn ? fn.length * BADGE_CHAR_WIDTH + 12 : 0;
@@ -188,6 +225,9 @@ function PersonCardView({ person, highlighted, onSelectLine, onHover }: PersonCa
       )}
       {person.placeholder && !person.role && (
         <text className="card-role" x={x + 12} y={y + 46}>Not defined yet</text>
+      )}
+      {person.placeholder && onDefine && (
+        <DefineButton x={x + width - 76} y={y + 8} label={`Define ${person.id}`} onClick={() => onDefine('person', person.id)} />
       )}
     </g>
   );

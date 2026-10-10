@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { parse } from '../core';
+import { definePlaceholder, parse } from '../core';
 import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
 import { ChartView, type ChartHandle } from './ChartView';
 import { Editor, type EditorHandle } from './Editor';
@@ -41,6 +41,12 @@ function Workspace({ file }: { file: OrgFile }) {
   }, [cursorLine]);
 
   const selectLine = useCallback((line: number) => editor.current?.goToLine(line), []);
+  const define = useCallback((kind: 'person' | 'team', id: string) => {
+    const e = editor.current;
+    if (!e) return;
+    const edit = definePlaceholder(e.getText(), kind, id);
+    e.applyEdit(edit.text, edit.line);
+  }, []);
 
   // A picked search result: highlighted until the cursor moves, and panned to once it's drawn.
   const [found, setFound] = useState<{ key: string; revealed: boolean } | null>(null);
@@ -130,6 +136,7 @@ function Workspace({ file }: { file: OrgFile }) {
             exportName={exportName(file.path)}
             onToggleTeam={collapse.toggle}
             onSelectLine={selectLine}
+            onDefine={define}
             highlight={found?.key ?? linked?.key ?? null}
             toolbar={
               <>

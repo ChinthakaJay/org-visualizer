@@ -18,6 +18,11 @@ export interface EditorHandle {
   replaceText(text: string): void;
   /** Put the cursor at the start of a 1-based line, scroll it into view and focus the editor. */
   goToLine(line: number): void;
+  /**
+   * Change the text as if the user typed it (so it autosaves and can be undone), then put the
+   * cursor at the end of a 1-based line and select it if asked.
+   */
+  applyEdit(text: string, line: number | null, options?: { select?: boolean }): void;
 }
 
 interface EditorProps {
@@ -96,6 +101,21 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
       const next = v.state.doc;
       const line = next.line(Math.min(head.number, next.lines));
       v.dispatch({ selection: { anchor: line.from + Math.min(column, line.length) } });
+    },
+    applyEdit(text, n, { select = false } = {}) {
+      const v = view.current!;
+      const old = v.state.doc.toString();
+      // Replace only the part that differs, so undo and the cursor behave naturally.
+      let start = 0;
+      while (start < old.length && start < text.length && old[start] === text[start]) start++;
+      let end = 0;
+      while (end < old.length - start && end < text.length - start && old[old.length - 1 - end] === text[text.length - 1 - end]) end++;
+      v.dispatch({ changes: { from: start, to: old.length - end, insert: text.slice(start, text.length - end) } });
+      if (n !== null) {
+        const line = v.state.doc.line(Math.max(1, Math.min(n, v.state.doc.lines)));
+        v.dispatch({ selection: select ? { anchor: line.from, head: line.to } : { anchor: line.to }, scrollIntoView: true });
+      }
+      v.focus();
     },
     goToLine(n) {
       const v = view.current!;

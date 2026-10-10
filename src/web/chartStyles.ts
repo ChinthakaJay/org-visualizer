@@ -30,6 +30,13 @@ export const CHART_CSS = `
 .chart-svg .team-title.link:hover { text-decoration: underline; }
 .chart-svg .card { cursor: pointer; }
 .chart-svg .card.placeholder { cursor: default; }
+.chart-svg .define-button { cursor: pointer; }
+.chart-svg .define-button rect { fill: var(--c-panel); stroke: var(--c-dotted); stroke-width: 1; }
+.chart-svg .define-button text { font-size: 11px; font-weight: 600; fill: var(--c-dotted); }
+.chart-svg .define-button:hover rect { fill: var(--c-dotted); }
+.chart-svg .define-button:hover text { fill: var(--c-panel); }
+.chart-svg .define-button:focus { outline: none; }
+.chart-svg .define-button:focus-visible rect { stroke-width: 2.5; }
 .chart-svg .highlight > .team-box, .chart-svg .highlight > .card-box {
   stroke: var(--c-highlight); stroke-width: 3; stroke-dasharray: none;
 }
