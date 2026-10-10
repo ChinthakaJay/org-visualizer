@@ -23,3 +23,18 @@ export async function saveOrgFile(text: string, baseVersion: string): Promise<Sa
   if (!res.ok) throw new Error(`Couldn't save the Org file (${res.status})`);
   return { ok: true, version: (await res.json()).version };
 }
+
+/**
+ * Calls `onChange` with the Org file whenever it changes on disk outside the app.
+ * After a dropped connection reconnects, it re-reads the file in case a change was missed.
+ */
+export function watchOrgFile(onChange: (file: OrgFile) => void): () => void {
+  const source = new EventSource('/api/events');
+  let opened = false;
+  source.addEventListener('change', (e) => onChange(JSON.parse((e as MessageEvent).data)));
+  source.addEventListener('open', () => {
+    if (opened) fetchOrgFile().then(onChange, () => {});
+    opened = true;
+  });
+  return () => source.close();
+}

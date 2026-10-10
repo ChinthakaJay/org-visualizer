@@ -163,3 +163,65 @@ describe('server: saving the Org file', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('server: changes on disk', () => {
+  /** Opens the event stream; once connected, `next` resolves with the next `change` event's data. */
+  const openEvents = async (url: string, signal: AbortSignal) => {
+    const res = await fetch(`${url}/api/events`, { signal });
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const read = async () => {
+      const { value, done } = await reader.read();
+      if (done) throw new Error('stream ended');
+      buffer += decoder.decode(value, { stream: true });
+    };
+    while (!buffer.includes(': connected')) await read();
+    return {
+      async next() {
+        for (;;) {
+          const m = buffer.match(/event: change\ndata: (.*)\n\n/);
+          if (m) {
+            buffer = buffer.slice(m.index! + m[0].length);
+            return JSON.parse(m[1]);
+          }
+          await read();
+        }
+      },
+    };
+  };
+
+  it('announces an edit made outside the app, with the new text and version', async () => {
+    const file = join(dir, 'org.txt');
+    await writeFile(file, 'a : A\n');
+    const { url } = await start(file);
+    const abort = new AbortController();
+    const events = await openEvents(url, abort.signal);
+
+    await writeFile(file, 'a : Edited elsewhere\n');
+    const change = await events.next();
+    abort.abort();
+
+    expect(change.text).toBe('a : Edited elsewhere\n');
+    const current = await (await fetch(`${url}/api/file`)).json();
+    expect(change.version).toBe(current.version);
+  });
+
+  it("doesn't announce the app's own saves", async () => {
+    const file = join(dir, 'org.txt');
+    await writeFile(file, 'a : A\n');
+    const { url } = await start(file);
+    const abort = new AbortController();
+    const events = await openEvents(url, abort.signal);
+    const { version } = await (await fetch(`${url}/api/file`)).json();
+
+    await fetch(`${url}/api/file`, { method: 'PUT', body: JSON.stringify({ text: 'a : Saved in app\n', baseVersion: version }) });
+    await new Promise((ok) => setTimeout(ok, 300));
+    await writeFile(file, 'a : Then edited elsewhere\n');
+    const change = await events.next();
+    abort.abort();
+
+    expect(change.text).toBe('a : Then edited elsewhere\n');
+  });
+});

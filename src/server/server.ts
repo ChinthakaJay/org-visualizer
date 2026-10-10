@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
+import { watch } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { extname, resolve, sep } from 'node:path';
+import { basename, dirname, extname, resolve, sep } from 'node:path';
 import { TEMPLATE } from '../core/template';
 
 /** ADR-0002: the server owns one Org file, binds to 127.0.0.1, and touches nothing else. */
@@ -47,12 +48,47 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     return { path: filePath, text, version: versionOf(text) };
   };
 
+  /** The version last written by us or announced to clients, so our own saves aren't echoed as outside edits. */
+  let knownVersion = (await readOrg()).version;
+
   /** Saves only if the file on disk is still the version the client last saw. */
   const save = async (text: string, baseVersion: string): Promise<[number, unknown]> => {
     const current = await readOrg();
     if (current.version !== baseVersion) return [409, current];
+    knownVersion = versionOf(text);
     await writeFile(filePath, text, 'utf8');
-    return [200, { version: versionOf(text) }];
+    return [200, { version: knownVersion }];
+  };
+
+  const listeners = new Set<ServerResponse>();
+  const announce = (event: string, data: unknown) => {
+    for (const res of listeners) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Watch the folder, not the file: many editors (and git) save by replacing the file.
+  let debounce: NodeJS.Timeout | undefined;
+  const watcher = watch(dirname(filePath), (_type, name) => {
+    if (name !== null && name !== basename(filePath)) return;
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      serialized(async () => {
+        const current = await readOrg().catch(() => null);
+        if (!current || current.version === knownVersion) return;
+        knownVersion = current.version;
+        announce('change', current);
+      });
+    }, 40);
+  });
+
+  const openEvents = (req: IncomingMessage, res: ServerResponse) => {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+    res.write(': connected\n\n');
+    listeners.add(res);
+    const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
+    req.on('close', () => {
+      clearInterval(ping);
+      listeners.delete(res);
+    });
   };
 
   let queue: Promise<unknown> = Promise.resolve();
@@ -76,6 +112,7 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
       if (typeof body?.text !== 'string' || typeof body?.baseVersion !== 'string') return send(res, 400, 'Expected { text, baseVersion }');
       return sendJson(res, ...(await serialized(() => save(body.text, body.baseVersion))));
     }
+    if (url.pathname === '/api/events' && req.method === 'GET') return openEvents(req, res);
     if (url.pathname.startsWith('/api/')) return send(res, 404, 'Not found');
 
     return serveStatic(res, staticDir, url.pathname);
@@ -96,6 +133,9 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     address,
     port,
     close: () => new Promise((ok) => {
+      watcher.close();
+      clearTimeout(debounce);
+      for (const res of listeners) res.end();
       server.closeAllConnections();
       server.close(() => ok());
     }),

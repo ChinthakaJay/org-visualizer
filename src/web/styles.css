@@ -93,3 +93,15 @@ button, input, select { font: inherit; color: inherit; }
   padding: 4px 10px; border-radius: 6px; font-size: 12px;
   background: var(--warn-soft); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
 }
+
+.app:has(.conflict-banner) { grid-template-rows: auto auto 1fr auto; }
+.conflict-banner {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--warn-soft); color: var(--warn); border-bottom: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+}
+.conflict-banner span { flex: 1; }
+.conflict-banner button, .toolbar button {
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink);
+  border-radius: 6px; padding: 3px 10px; cursor: pointer;
+}
+.conflict-banner button:hover, .toolbar button:hover { border-color: var(--accent); }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchOrgFile, type OrgFile } from './api';
+import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
 import { Chart } from './Chart';
 import { Editor, type EditorHandle } from './Editor';
 import { useAutosave, type SaveState } from './useAutosave';
@@ -22,7 +22,40 @@ function Workspace({ file }: { file: OrgFile }) {
   const editor = useRef<EditorHandle>(null);
   const [text, setText] = useState(file.text);
   const { scene, stale } = useScene(text);
-  const save = useAutosave(file, text, () => {});
+  /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
+  const [conflict, setConflict] = useState<OrgFile | null>(null);
+  const save = useAutosave(file, text, setConflict);
+
+  const latest = useRef({ text, saved: save.saved });
+  latest.current = { text, saved: save.saved };
+
+  const loadFromDisk = (disk: OrgFile) => {
+    editor.current?.replaceText(disk.text);
+    setText(disk.text);
+    save.setSaved({ text: disk.text, version: disk.version });
+    save.setState('saved');
+    setConflict(null);
+  };
+
+  useEffect(
+    () =>
+      watchOrgFile((disk) => {
+        const { text: current, saved } = latest.current;
+        if (disk.version === saved?.version) return;
+        const unsaved = saved !== null && current !== saved.text;
+        if (!unsaved || current === disk.text) loadFromDisk(disk);
+        else setConflict(disk);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const keepMine = (disk: OrgFile) => {
+    // Treat the disk version as seen, so the next autosave overwrites it on purpose.
+    save.setSaved({ text: disk.text, version: disk.version });
+    save.setState('unsaved');
+    setConflict(null);
+  };
 
   return (
     <div className="app">
@@ -32,6 +65,13 @@ function Workspace({ file }: { file: OrgFile }) {
         <span className="spacer" />
         <SaveIndicator state={save.state} />
       </header>
+      {conflict && (
+        <div className="conflict-banner" role="alert">
+          <span>The Org file changed on disk while you had unsaved edits.</span>
+          <button onClick={() => loadFromDisk(conflict)}>Reload</button>
+          <button onClick={() => keepMine(conflict)}>Keep mine</button>
+        </div>
+      )}
       <main className="panes">
         <section className="pane editor-pane">
           <Editor ref={editor} initialText={file.text} onChange={setText} />
