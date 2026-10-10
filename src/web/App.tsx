@@ -5,6 +5,7 @@ import { ChartView, type ChartHandle } from './ChartView';
 import { Editor, type EditorHandle } from './Editor';
 import { elementForLine } from './linking';
 import { ProblemsPanel } from './ProblemsPanel';
+import { Search, type SearchResult } from './Search';
 import { useAutosave, type SaveState } from './useAutosave';
 import { useCollapse } from './useCollapse';
 import { useScene } from './useScene';
@@ -40,6 +41,26 @@ function Workspace({ file }: { file: OrgFile }) {
   }, [cursorLine]);
 
   const selectLine = useCallback((line: number) => editor.current?.goToLine(line), []);
+
+  // A picked search result: highlighted until the cursor moves, and panned to once it's drawn.
+  const [found, setFound] = useState<{ key: string; revealed: boolean } | null>(null);
+  const pickResult = (r: SearchResult) => {
+    if (r.kind === 'person') collapse.expandTo(org.people.get(r.id)?.team ?? null);
+    else collapse.expandTo(org.teams.get(r.id)?.parent ?? null);
+    setFound({ key: `${r.kind}:${r.id}`, revealed: false });
+  };
+  useEffect(() => {
+    if (!scene || !found || found.revealed) return;
+    const [kind, id] = [found.key.slice(0, found.key.indexOf(':')), found.key.slice(found.key.indexOf(':') + 1)];
+    const element = kind === 'person' ? scene.people.find((p) => p.id === id) : scene.teams.find((t) => t.id === id);
+    if (!element) return; // still hidden: wait for the redraw after expanding
+    chart.current?.reveal(element);
+    setFound({ ...found, revealed: true });
+  }, [scene, found]);
+  const onCursorLine = useCallback((line: number) => {
+    setCursorLine(line);
+    setFound(null);
+  }, []);
   /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
   const [conflict, setConflict] = useState<OrgFile | null>(null);
   const save = useAutosave(file, text, setConflict);
@@ -97,7 +118,7 @@ function Workspace({ file }: { file: OrgFile }) {
             initialText={file.text}
             onChange={setText}
             problems={org.problems}
-            onCursorLine={setCursorLine}
+            onCursorLine={onCursorLine}
           />
           <ProblemsPanel problems={org.problems} onJump={(line) => editor.current?.goToLine(line)} />
         </section>
@@ -109,8 +130,13 @@ function Workspace({ file }: { file: OrgFile }) {
             exportName={exportName(file.path)}
             onToggleTeam={collapse.toggle}
             onSelectLine={selectLine}
-            highlight={linked?.key ?? null}
-            toolbar={<CollapseControls collapse={collapse} />}
+            highlight={found?.key ?? linked?.key ?? null}
+            toolbar={
+              <>
+                <Search org={org} onPick={pickResult} />
+                <CollapseControls collapse={collapse} />
+              </>
+            }
           />
         </section>
       </main>
