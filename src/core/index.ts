@@ -1,5 +1,6 @@
 export * from './org';
 export { parse } from './parse';
+export { format } from './format';
 export * from './scene';
 export { TEMPLATE } from './template';
 export * from './colours';

@@ -43,7 +43,7 @@ export const WALKTHROUGHS: Walkthrough[] = [
       {
         label: 'A new top-level Team, Group Tech, holds FinTech and Platform',
         run: (t) => {
-          const added = addLine(t, 'team group    : Group Tech');
+          const added = addLine(t, 'team group : Group Tech');
           let r = setField(added.text, 'team', 'fintech', 'parent', 'group');
           r = setField(r.text, 'team', 'platform', 'parent', 'group');
           return { ...added, text: r.text, note: 'Plus parent=group on the FinTech and Platform lines.' };
@@ -56,10 +56,10 @@ export const WALKTHROUGHS: Walkthrough[] = [
     description:
       "You meet someone whose Manager and Team you only know by name. They're drawn as dashed Placeholders, and become real as soon as you add their lines.",
     steps: [
-      { label: 'Add Ivy (Team "ml", reports to "kai"; neither is defined yet)', run: (t) => addLine(t, 'ivy   : Ivy Chen    | team=ml | reports=kai') },
-      { label: 'Now you learn about Kai', run: (t) => addLine(t, 'kai   : Kai Wu      | team=ml | role=Head of ML') },
-      { label: 'And that ML sits under Platform', run: (t) => addLine(t, 'team ml       : Machine Learning | parent=platform') },
-      { label: "And who Frank (Eve's Manager) is", run: (t) => addLine(t, 'frank : Frank Ode   | team=risk | role=Risk Lead') },
+      { label: 'Add Ivy (Team "ml", reports to "kai"; neither is defined yet)', run: (t) => addLine(t, 'ivy : Ivy Chen | team=ml | reports=kai') },
+      { label: 'Now you learn about Kai', run: (t) => addLine(t, 'kai : Kai Wu | team=ml | role=Head of ML') },
+      { label: 'And that ML sits under Platform', run: (t) => addLine(t, 'team ml : Machine Learning | parent=platform') },
+      { label: "And who Frank (Eve's Manager) is", run: (t) => addLine(t, 'frank : Frank Ode | team=risk | role=Risk Lead') },
     ],
   },
   {
@@ -79,7 +79,7 @@ export const WALKTHROUGHS: Walkthrough[] = [
       'Gia, a PM, reports to Alice but also works closely with Carol and with the product VP. Dotted lines record that matrix link without replacing her Reporting line.',
     steps: [
       { label: 'Gia gets a Dotted line to Carol', run: (t) => setField(t, 'person', 'gia', 'dotted', 'carol') },
-      { label: 'Add Vera, the product VP', run: (t) => addLine(t, 'vp    : Vera Patel  | role=VP Product | fn=product') },
+      { label: 'Add Vera, the product VP', run: (t) => addLine(t, 'vp : Vera Patel | role=VP Product | fn=product') },
       { label: 'Gia gets a second Dotted line, to Vera', run: (t) => setField(t, 'person', 'gia', 'dotted', 'carol,vp') },
     ],
   },

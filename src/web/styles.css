@@ -73,6 +73,27 @@ button, input, select { font: inherit; color: inherit; }
 .editor .cm-scroller { font: 13px/1.6 var(--mono); }
 .editor .cm-editor.cm-focused { outline: none; }
 
+/* Find and Replace: CodeMirror's search panel, in the app's colours (both themes). */
+.editor .cm-editor .cm-panels { background: var(--panel); color: var(--ink); }
+.editor .cm-editor .cm-panels-top { border-bottom: 1px solid var(--rule); }
+.editor .cm-editor .cm-panel.cm-search { padding: 6px 28px 6px 10px; font-size: 13px; }
+.editor .cm-editor .cm-panel.cm-search label { font-size: 12px; color: var(--muted); }
+.editor .cm-editor .cm-textfield {
+  border: 1px solid var(--rule); background: var(--bg); color: var(--ink);
+  border-radius: 6px; padding: 2px 6px; font: 12px var(--mono);
+}
+.editor .cm-editor .cm-textfield:focus { outline: none; border-color: var(--accent); }
+.editor .cm-editor .cm-button {
+  border: 1px solid var(--rule); background: var(--panel); background-image: none; color: var(--ink);
+  border-radius: 6px; padding: 2px 8px; cursor: pointer;
+}
+.editor .cm-editor .cm-button:hover { border-color: var(--accent); }
+.editor .cm-editor .cm-button:active { background: var(--accent-soft); background-image: none; }
+.editor .cm-editor .cm-panel.cm-search [name=close] { color: var(--muted); top: 6px; right: 8px; cursor: pointer; }
+.editor .cm-editor .cm-searchMatch { background: color-mix(in srgb, var(--warn) 25%, transparent); outline: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); }
+.editor .cm-editor .cm-searchMatch-selected { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.editor .cm-editor .cm-selectionMatch { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+
 .chart-pane { position: relative; }
 .chart-viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none; }
 .chart-viewport.dragging { cursor: grabbing; }

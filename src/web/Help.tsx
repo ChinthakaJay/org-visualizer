@@ -213,6 +213,8 @@ function KeyboardReference() {
     ['Details', 'Hover a person card'],
     ['Define a Placeholder', 'Click + Define on it'],
     ['Undo / redo in the editor', '⌘Z / ⇧⌘Z (Ctrl+Z / Ctrl+Y)'],
+    ['Find and replace text in the editor', 'Find, or ⌘F (Ctrl+F). Replace is in the same panel'],
+    ['Tidy the spacing of every line', 'Format, or ⇧⌥F (Shift+Alt+F). Lines that can\'t be read are left alone'],
     ['Close Help', 'Esc'],
   ];
   return (
