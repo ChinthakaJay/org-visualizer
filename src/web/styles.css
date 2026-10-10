@@ -82,3 +82,14 @@ button, input, select { font: inherit; color: inherit; }
   .panes { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }
   .editor-pane { border-right: 0; border-bottom: 1px solid var(--rule); }
 }
+
+.save-state { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.save-state.unsaved, .save-state.saving { color: var(--muted); }
+.save-state.conflict, .save-state.error { color: var(--err); }
+
+.chart-viewport.stale { opacity: 0.45; filter: grayscale(0.6); }
+.stale-badge {
+  position: absolute; z-index: 5; top: 52px; left: 50%; transform: translateX(-50%);
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  background: var(--warn-soft); color: var(--warn); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}

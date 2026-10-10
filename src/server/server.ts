@@ -47,6 +47,21 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     return { path: filePath, text, version: versionOf(text) };
   };
 
+  /** Saves only if the file on disk is still the version the client last saw. */
+  const save = async (text: string, baseVersion: string): Promise<[number, unknown]> => {
+    const current = await readOrg();
+    if (current.version !== baseVersion) return [409, current];
+    await writeFile(filePath, text, 'utf8');
+    return [200, { version: versionOf(text) }];
+  };
+
+  let queue: Promise<unknown> = Promise.resolve();
+  const serialized = <T>(task: () => Promise<T>): Promise<T> => {
+    const run = queue.then(task, task);
+    queue = run.catch(() => {});
+    return run;
+  };
+
   const handle = async (req: IncomingMessage, res: ServerResponse) => {
     const hostname = (req.headers.host ?? '').replace(/:\d+$/, '');
     if (!ALLOWED_HOSTS.has(hostname)) return send(res, 403, 'Forbidden');
@@ -56,6 +71,11 @@ export async function startServer(options: ServerOptions): Promise<RunningServer
     if (named !== null && resolve(named) !== filePath) return send(res, 403, 'Only the Org file this server was started with is available');
 
     if (url.pathname === '/api/file' && req.method === 'GET') return sendJson(res, 200, await readOrg());
+    if (url.pathname === '/api/file' && req.method === 'PUT') {
+      const body = await readJson(req);
+      if (typeof body?.text !== 'string' || typeof body?.baseVersion !== 'string') return send(res, 400, 'Expected { text, baseVersion }');
+      return sendJson(res, ...(await serialized(() => save(body.text, body.baseVersion))));
+    }
     if (url.pathname.startsWith('/api/')) return send(res, 404, 'Not found');
 
     return serveStatic(res, staticDir, url.pathname);
@@ -96,6 +116,23 @@ async function serveStatic(res: ServerResponse, root: string, pathname: string) 
   if (!(await isFile(file))) return send(res, 404, 'Front end not built. Run `npm run build`.');
   res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
   res.end(await readFile(file));
+}
+
+const MAX_BODY = 5 * 1024 * 1024;
+
+async function readJson(req: IncomingMessage): Promise<any> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_BODY) return null;
+    chunks.push(chunk);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    return null;
+  }
 }
 
 function send(res: ServerResponse, status: number, body: string) {

@@ -123,3 +123,43 @@ describe('cli', () => {
     expect(errors.join('\n')).toMatch(/usage/i);
   });
 });
+
+describe('server: saving the Org file', () => {
+  const save = (url: string, body: unknown) =>
+    fetch(`${url}/api/file`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+
+  it('saves the text when the client sends the current version', async () => {
+    const file = join(dir, 'org.txt');
+    await writeFile(file, 'a : A\n');
+    const { url } = await start(file);
+    const { version } = await (await fetch(`${url}/api/file`)).json();
+
+    const res = await save(url, { text: 'a : Alice\n', baseVersion: version });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(await readFile(file, 'utf8')).toBe('a : Alice\n');
+    expect(body.version).not.toBe(version);
+    expect((await (await fetch(`${url}/api/file`)).json()).version).toBe(body.version);
+  });
+
+  it('rejects a save with a stale version and leaves the file on disk untouched', async () => {
+    const file = join(dir, 'org.txt');
+    await writeFile(file, 'a : A\n');
+    const { url } = await start(file);
+    const { version } = await (await fetch(`${url}/api/file`)).json();
+    await writeFile(file, 'a : Changed outside\n');
+
+    const res = await save(url, { text: 'a : Mine\n', baseVersion: version });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body).toMatchObject({ text: 'a : Changed outside\n' });
+    expect(await readFile(file, 'utf8')).toBe('a : Changed outside\n');
+  });
+
+  it('rejects a save without text', async () => {
+    const file = join(dir, 'org.txt');
+    const { url } = await start(file);
+    const res = await save(url, { baseVersion: 'x' });
+    expect(res.status).toBe(400);
+  });
+});
