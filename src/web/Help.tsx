@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { COLOUR_NAMES, SAMPLE } from '../core';
+import { COLOUR_NAMES, SAMPLE, WALKTHROUGHS, type StepResult } from '../core';
 import { OrgWorkbench, type WorkbenchHandle } from './OrgWorkbench';
 
-type Tab = 'syntax' | 'keys';
+type Tab = 'syntax' | 'walkthroughs' | 'keys';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'syntax', label: 'Syntax reference' },
+  { id: 'walkthroughs', label: 'Walkthroughs' },
   { id: 'keys', label: 'Keyboard & mouse' },
 ];
 
@@ -34,7 +35,14 @@ export function Help({ onClose }: { onClose(): void }) {
         <span className="app-name">Help</span>
         <span className="help-note">A sandbox with its own sample file. Nothing here changes your Org file.</span>
         <span className="spacer" />
-        <button onClick={() => sandbox.current?.replaceText(SAMPLE)}>Reset sample</button>
+        <button
+          onClick={() => {
+            sandbox.current?.replaceText(SAMPLE);
+            sandbox.current?.setCollapsed([]);
+          }}
+        >
+          Reset sample
+        </button>
         <button className="help-close" onClick={onClose} aria-label="Close Help">Close</button>
       </header>
       <div className="help-body">
@@ -48,6 +56,7 @@ export function Help({ onClose }: { onClose(): void }) {
           </nav>
           <div className="help-content" role="tabpanel">
             {tab === 'syntax' && <SyntaxReference />}
+            {tab === 'walkthroughs' && <Walkthroughs sandbox={sandbox} />}
             {tab === 'keys' && <KeyboardReference />}
           </div>
         </aside>
@@ -55,6 +64,84 @@ export function Help({ onClose }: { onClose(): void }) {
           <OrgWorkbench ref={sandbox} initialText={SAMPLE} collapseKey={null} exportName="sample.svg" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Step-by-step walkthroughs that apply each edit to the sandbox and show the line that changed. */
+function Walkthroughs({ sandbox }: { sandbox: React.RefObject<WorkbenchHandle | null> }) {
+  const [active, setActive] = useState<number | null>(null);
+  const [done, setDone] = useState(0);
+  const [change, setChange] = useState<StepResult | null>(null);
+
+  const start = (i: number) => {
+    setActive(i);
+    setDone(0);
+    setChange(null);
+    sandbox.current?.replaceText(SAMPLE);
+    sandbox.current?.setCollapsed([]);
+  };
+
+  const runStep = (i: number) => {
+    const s = sandbox.current;
+    if (active === null || !s) return;
+    const result = WALKTHROUGHS[active].steps[i].run(s.getText());
+    if (result.text !== s.getText()) s.applyEdit(result.text, result.line, { select: true });
+    if (result.collapse) s.setCollapsed(result.collapse);
+    setChange(result);
+    setDone(i + 1);
+  };
+
+  const walkthrough = active === null ? null : WALKTHROUGHS[active];
+  return (
+    <div className="walkthroughs">
+      <p>Each walkthrough starts from the sample and shows how a real-world change becomes a one-line edit.</p>
+      <div className="walkthrough-list">
+        {WALKTHROUGHS.map((w, i) => (
+          <button key={w.name} className={i === active ? 'on' : ''} aria-pressed={i === active} onClick={() => start(i)}>
+            {w.name}
+          </button>
+        ))}
+      </div>
+      {walkthrough && (
+        <section className="walkthrough">
+          <h3>{walkthrough.name}</h3>
+          <p>{walkthrough.description}</p>
+          <ol className="walkthrough-steps">
+            {walkthrough.steps.map((step, i) => (
+              <li key={step.label}>
+                <button
+                  className={i < done ? 'done' : i === done ? 'next' : ''}
+                  disabled={i !== done}
+                  onClick={() => runStep(i)}
+                >
+                  {step.label}
+                </button>
+              </li>
+            ))}
+          </ol>
+          {done === walkthrough.steps.length && (
+            <p className="walkthrough-end">
+              Done. <button className="link" onClick={() => start(active!)}>Start again</button>
+            </p>
+          )}
+          {change && <ChangeView change={change} />}
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** The exact line a step changed, before and after, or a note when it wasn't a single line. */
+function ChangeView({ change }: { change: StepResult }) {
+  if (change.line === null) {
+    return <div className="change" role="status"><span className="change-note">{change.note}</span></div>;
+  }
+  return (
+    <div className="change" role="status">
+      <div className="change-title">Line {change.line}</div>
+      {change.before !== null && <pre className="minus">- {change.before}</pre>}
+      <pre className="plus">+ {change.after}</pre>
     </div>
   );
 }

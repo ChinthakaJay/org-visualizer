@@ -202,3 +202,24 @@ button, input, select { font: inherit; color: inherit; }
   .help-body { grid-template-columns: 1fr; grid-template-rows: 40% 1fr; }
   .help-side { border-right: 0; border-bottom: 1px solid var(--rule); }
 }
+
+/* ---- Walkthroughs ---- */
+.walkthrough-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.walkthrough-list button, .walkthrough-steps button {
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer; font-size: 13px; text-align: left;
+}
+.walkthrough-list button:hover, .walkthrough-steps button:not(:disabled):hover { border-color: var(--accent); }
+.walkthrough-list button.on { background: var(--accent-soft); border-color: var(--accent); }
+.walkthrough { border-top: 1px solid var(--rule); margin-top: 12px; }
+.walkthrough-steps { padding-left: 20px; margin: 8px 0; display: grid; gap: 6px; }
+.walkthrough-steps button:disabled { cursor: default; opacity: 0.5; }
+.walkthrough-steps button.done { opacity: 0.55; }
+.walkthrough-steps button.next { background: var(--accent); border-color: var(--accent); color: #fff; opacity: 1; }
+.walkthrough-end { color: var(--muted); }
+button.link { all: unset; color: var(--accent); cursor: pointer; text-decoration: underline; }
+.change { margin: 10px 0; padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); font-size: 12.5px; }
+.change-title { font-weight: 600; margin-bottom: 4px; }
+.change pre { margin: 0; font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.change .minus { color: var(--err); }
+.change .plus { color: var(--ok); }

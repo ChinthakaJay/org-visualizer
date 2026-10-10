@@ -5,3 +5,4 @@ export { TEMPLATE } from './template';
 export * from './colours';
 export * from './edits';
 export { SAMPLE } from './sample';
+export * from './walkthroughs';

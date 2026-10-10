@@ -109,7 +109,8 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
       v.dispatch({ changes: { from: start, to: old.length - end, insert: text.slice(start, text.length - end) } });
       if (n !== null) {
         const line = v.state.doc.line(Math.max(1, Math.min(n, v.state.doc.lines)));
-        v.dispatch({ selection: select ? { anchor: line.from, head: line.to } : { anchor: line.to }, scrollIntoView: true });
+        // A selected line is selected backwards, so a long line scrolls to its start, not its end.
+        v.dispatch({ selection: select ? { anchor: line.to, head: line.from } : { anchor: line.to }, scrollIntoView: true });
       }
       v.focus();
     },
