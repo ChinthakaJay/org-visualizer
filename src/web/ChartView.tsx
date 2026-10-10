@@ -172,11 +172,13 @@ export const ChartView = forwardRef<ChartHandle, ChartViewProps>(function ChartV
       <div className="toolbar" role="toolbar" aria-label="Chart">
         {toolbar}
         <span className="spacer" />
-        <button onClick={() => zoomCentre(1 / 1.25)} title="Zoom out" aria-label="Zoom out">−</button>
-        <span className="zoom-level" aria-live="polite">{Math.round(view.k * 100)}%</span>
-        <button onClick={() => zoomCentre(1.25)} title="Zoom in" aria-label="Zoom in">+</button>
-        <button onClick={fit} title="Frame the whole chart">Fit</button>
-        <button onClick={exportSvg} disabled={!scene} title="Download the chart as an SVG file">Export SVG</button>
+        <span className="toolbar-group">
+          <button onClick={() => zoomCentre(1 / 1.25)} title="Zoom out" aria-label="Zoom out">−</button>
+          <span className="zoom-level" aria-live="polite">{Math.round(view.k * 100)}%</span>
+          <button onClick={() => zoomCentre(1.25)} title="Zoom in" aria-label="Zoom in">+</button>
+          <button onClick={fit} title="Frame the whole chart">Fit</button>
+          <button onClick={exportSvg} disabled={!scene} title="Download the chart as an SVG file">Export SVG</button>
+        </span>
       </div>
       {stale && <div className="stale-badge" role="status">Couldn't redraw. Showing the last good chart.</div>}
       <div

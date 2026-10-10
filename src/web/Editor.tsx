@@ -14,7 +14,7 @@ import type { Problem } from '../core';
 
 export interface EditorHandle {
   getText(): string;
-  /** Replace the whole document. The cursor stays on the same line and column where possible. */
+  /** Replace the whole document (reported through onChange). The cursor stays on the same line and column where possible. */
   replaceText(text: string): void;
   /** Put the cursor at the start of a 1-based line, scroll it into view and focus the editor. */
   goToLine(line: number): void;
@@ -41,8 +41,6 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
   const handlers = useRef({ onChange, onCursorLine });
   handlers.current = { onChange, onCursorLine };
   const cursorLine = useRef(0);
-  /** Set while we replace the text ourselves, so it isn't reported as a user edit. */
-  const replacing = useRef(false);
 
   useEffect(() => {
     const v = new EditorView({
@@ -58,7 +56,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((u) => {
-            if (u.docChanged && !replacing.current) handlers.current.onChange?.(u.state.doc.toString());
+            if (u.docChanged) handlers.current.onChange?.(u.state.doc.toString());
             if (u.docChanged || u.selectionSet) {
               const line = u.state.doc.lineAt(u.state.selection.main.head).number;
               if (line !== cursorLine.current) {
@@ -95,9 +93,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
       const { doc, selection } = v.state;
       const head = doc.lineAt(selection.main.head);
       const column = selection.main.head - head.from;
-      replacing.current = true;
       v.dispatch({ changes: { from: 0, to: doc.length, insert: text } });
-      replacing.current = false;
       const next = v.state.doc;
       const line = next.line(Math.min(head.number, next.lines));
       v.dispatch({ selection: { anchor: line.from + Math.min(column, line.length) } });

@@ -22,18 +22,25 @@ function store(path: string, collapsed: ReadonlySet<string>) {
 
 /**
  * Which Teams are collapsed. A viewing choice only: kept in the browser per Org file path, never in
- * the file. The first time a file is opened, every Team starts collapsed.
+ * the file. The first time a file is opened, every Team starts collapsed. With no path (the Help
+ * sandbox) it lives in memory and starts fully expanded.
  */
-export function useCollapse(path: string, org: Org) {
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => load(path) ?? new Set(org.teams.keys()));
+export function useCollapse(path: string | null, org: Org) {
+  const [collapsed, setCollapsedState] = useState<ReadonlySet<string>>(() =>
+    path === null ? new Set() : (load(path) ?? new Set(org.teams.keys())),
+  );
 
-  useEffect(() => store(path, collapsed), [path, collapsed]);
+  useEffect(() => {
+    if (path !== null) store(path, collapsed);
+  }, [path, collapsed]);
+
+  const setCollapsed = useCallback((ids: Iterable<string>) => setCollapsedState(new Set(ids)), []);
 
   const depths = useMemo(() => teamDepths(org), [org]);
   const maxDepth = Math.max(0, ...depths.values());
 
   const toggle = useCallback((id: string) => {
-    setCollapsed((prev) => {
+    setCollapsedState((prev) => {
       const next = new Set(prev);
       if (!next.delete(id)) next.add(id);
       return next;
@@ -45,19 +52,20 @@ export function useCollapse(path: string, org: Org) {
     (teamId: string | null) => {
       const chain: string[] = [];
       for (let t = teamId ? org.teams.get(teamId) : undefined; t; t = t.parent ? org.teams.get(t.parent) : undefined) chain.push(t.id);
-      setCollapsed((prev) => (chain.some((id) => prev.has(id)) ? new Set([...prev].filter((id) => !chain.includes(id))) : prev));
+      setCollapsedState((prev) => (chain.some((id) => prev.has(id)) ? new Set([...prev].filter((id) => !chain.includes(id))) : prev));
     },
     [org],
   );
 
   return {
     collapsed,
+    setCollapsed,
     toggle,
     expandTo,
     maxDepth,
-    collapseAll: () => setCollapsed(new Set(org.teams.keys())),
-    expandAll: () => setCollapsed(new Set()),
+    collapseAll: () => setCollapsed(org.teams.keys()),
+    expandAll: () => setCollapsed([]),
     /** Show Teams down to `depth` levels; anything deeper is collapsed. */
-    collapseToDepth: (depth: number) => setCollapsed(new Set([...depths].filter(([, d]) => d >= depth).map(([id]) => id))),
+    collapseToDepth: (depth: number) => setCollapsed([...depths].filter(([, d]) => d >= depth).map(([id]) => id)),
   };
 }
