@@ -73,6 +73,10 @@ button, input, select { font: inherit; color: inherit; }
   padding: 6px 10px; border-bottom: 1px solid var(--rule); background: var(--panel);
 }
 .toolbar button:disabled { opacity: 0.4; cursor: default; }
+.depth-select { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.depth-select select {
+  border: 1px solid var(--rule); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 2px 4px;
+}
 .zoom-level { font: 12px var(--mono); color: var(--muted); min-width: 40px; text-align: center; }
 
 .tooltip {

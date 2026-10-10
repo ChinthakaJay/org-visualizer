@@ -7,6 +7,8 @@ interface ChartProps {
   scene: Scene;
   /** The viewport's pan and zoom, as an SVG transform. */
   transform: string;
+  /** Collapse or expand a Team (clicking its header, or a Collapsed team's box). */
+  onToggleTeam?(id: string): void;
 }
 
 interface Hover {
@@ -16,7 +18,7 @@ interface Hover {
 }
 
 /** Draws a scene as SVG: Team boxes parent-first, then lines, then person cards on top. */
-export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform }, ref) {
+export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform, onToggleTeam }, ref) {
   const [hover, setHover] = useState<Hover | null>(null);
   return (
     <>
@@ -31,7 +33,7 @@ export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scen
           </marker>
         </defs>
         <g className="viewport-transform" transform={transform}>
-          <SceneContent scene={scene} onHover={setHover} />
+          <SceneContent scene={scene} onHover={setHover} onToggleTeam={onToggleTeam} />
         </g>
       </svg>
       {hover && <Tooltip {...hover} />}
@@ -40,10 +42,16 @@ export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scen
 });
 
 /** The drawing itself; memoised so panning and zooming only touch the transform. */
-const SceneContent = memo(function SceneContent({ scene, onHover }: { scene: Scene; onHover(h: Hover | null): void }) {
+interface SceneContentProps {
+  scene: Scene;
+  onHover(h: Hover | null): void;
+  onToggleTeam?(id: string): void;
+}
+
+const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam }: SceneContentProps) {
   return (
     <>
-      {scene.teams.map((t) => <TeamBoxView key={t.id} team={t} />)}
+      {scene.teams.map((t) => <TeamBoxView key={t.id} team={t} onToggle={onToggleTeam} />)}
       {scene.lines.map((l, i) => <LineView key={i} line={l} />)}
       {scene.people.map((p) => (
         <PersonCardView key={p.id} person={p} onHover={(e) => onHover(e && { person: p, x: e.clientX, y: e.clientY })} />
@@ -52,16 +60,49 @@ const SceneContent = memo(function SceneContent({ scene, onHover }: { scene: Sce
   );
 });
 
-function TeamBoxView({ team }: { team: TeamBox }) {
+function TeamBoxView({ team, onToggle }: { team: TeamBox; onToggle?(id: string): void }) {
+  const { x, y, width, height } = team;
+  const toggle = onToggle && (() => onToggle(team.id));
+  const label = `${team.collapsed ? 'Expand' : 'Collapse'} ${team.title}`;
+  const keyToggle = (e: React.KeyboardEvent) => {
+    if (toggle && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      toggle();
+    }
+  };
   return (
-    <g className={`team${team.placeholder ? ' placeholder' : ''}`} data-team={team.id} style={colourVars(team.colour)}>
-      <rect className="team-box" x={team.x} y={team.y} width={team.width} height={team.height} rx={10} />
-      <text className="team-title" x={team.x + 12} y={team.y + TEAM_HEADER / 2 + 5}>
-        {team.title}
-      </text>
+    <g
+      className={`team${team.placeholder ? ' placeholder' : ''}${team.collapsed ? ' collapsed' : ''}`}
+      data-team={team.id}
+      style={colourVars(team.colour)}
+    >
+      <rect className="team-box" x={x} y={y} width={width} height={height} rx={10} />
+      {/* The header (or a whole Collapsed team) is the collapse / expand target. */}
+      <rect
+        className="team-hit"
+        x={x} y={y} width={width} height={team.collapsed ? height : TEAM_HEADER} rx={10}
+        role={toggle ? 'button' : undefined}
+        tabIndex={toggle ? 0 : undefined}
+        aria-label={toggle ? label : undefined}
+        aria-expanded={toggle ? !team.collapsed : undefined}
+        onClick={toggle}
+        onKeyDown={keyToggle}
+      >
+        <title>{label}</title>
+      </rect>
+      <text className="team-chevron" x={x + 12} y={y + TEAM_HEADER / 2 + 5}>{team.collapsed ? '▸' : '▾'}</text>
+      <text className="team-title" x={x + 28} y={y + TEAM_HEADER / 2 + 5}>{clip(team.title, Math.floor((width - 40) / 7.5))}</text>
+      {team.counts && (
+        <text className="team-counts" x={x + 28} y={y + TEAM_HEADER + 18}>
+          {countLabel(team.counts.people, 'Person', 'People')}
+          {team.counts.teams > 0 && ` · ${countLabel(team.counts.teams, 'sub-team', 'sub-teams')}`}
+        </text>
+      )}
     </g>
   );
 }
+
+const countLabel = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const BADGE_CHAR_WIDTH = 6.4;
 

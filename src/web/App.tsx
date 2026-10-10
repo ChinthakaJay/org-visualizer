@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { parse } from '../core';
 import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
 import { ChartView, type ChartHandle } from './ChartView';
 import { Editor, type EditorHandle } from './Editor';
 import { ProblemsPanel } from './ProblemsPanel';
 import { useAutosave, type SaveState } from './useAutosave';
+import { useCollapse } from './useCollapse';
 import { useScene } from './useScene';
 
 export function App() {
@@ -23,7 +25,9 @@ function Workspace({ file }: { file: OrgFile }) {
   const editor = useRef<EditorHandle>(null);
   const chart = useRef<ChartHandle>(null);
   const [text, setText] = useState(file.text);
-  const { org, scene, stale } = useScene(text);
+  const org = useMemo(() => parse(text), [text]);
+  const collapse = useCollapse(file.path, org);
+  const { scene, stale } = useScene(org, collapse.collapsed);
   /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
   const [conflict, setConflict] = useState<OrgFile | null>(null);
   const save = useAutosave(file, text, setConflict);
@@ -80,7 +84,14 @@ function Workspace({ file }: { file: OrgFile }) {
           <ProblemsPanel problems={org.problems} onJump={(line) => editor.current?.goToLine(line)} />
         </section>
         <section className="pane chart-pane">
-          <ChartView ref={chart} scene={scene} stale={stale} exportName={exportName(file.path)} />
+          <ChartView
+            ref={chart}
+            scene={scene}
+            stale={stale}
+            exportName={exportName(file.path)}
+            onToggleTeam={collapse.toggle}
+            toolbar={<CollapseControls collapse={collapse} />}
+          />
         </section>
       </main>
       <footer className="status-bar">
@@ -100,6 +111,28 @@ function Workspace({ file }: { file: OrgFile }) {
 const exportName = (path: string) => (path.split(/[\\/]/).pop() ?? 'org').replace(/\.[^.]*$/, '') + '.svg';
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+function CollapseControls({ collapse }: { collapse: ReturnType<typeof useCollapse> }) {
+  const depths = Array.from({ length: collapse.maxDepth + 1 }, (_, i) => i + 1);
+  return (
+    <>
+      <button onClick={collapse.collapseAll}>Collapse all</button>
+      <button onClick={collapse.expandAll}>Expand all</button>
+      <label className="depth-select">
+        Collapse to depth
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) collapse.collapseToDepth(Number(e.target.value));
+          }}
+        >
+          <option value="">…</option>
+          {depths.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+      </label>
+    </>
+  );
+}
 
 const SAVE_LABELS: Record<SaveState, string> = {
   saved: 'Saved',

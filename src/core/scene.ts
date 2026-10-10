@@ -14,6 +14,10 @@ export interface TeamBox extends Rect {
   colour: TeamColour | null;
   line: number | null;
   placeholder: boolean;
+  /** Drawn as one box in place of its contents. */
+  collapsed: boolean;
+  /** Everything inside a Collapsed team, at any depth; null when expanded. */
+  counts: { people: number; teams: number } | null;
 }
 
 export interface PersonCard extends Rect {
@@ -36,12 +40,16 @@ export interface PersonCard extends Rect {
   };
 }
 
+export type EndKind = 'person' | 'team';
+
 export interface SceneLine {
   kind: 'reporting' | 'dotted';
-  /** The Manager, or the other end of a Dotted line. */
+  /** The Manager, or the other end of a Dotted line, or the Collapsed team that holds them. */
   from: string;
-  /** The report. */
+  fromKind: EndKind;
+  /** The report, or the Collapsed team that holds them. */
   to: string;
+  toKind: EndKind;
   /** Routed polyline in scene coordinates, from the `from` end to the `to` end. */
   points: Point[];
 }
@@ -65,6 +73,7 @@ export interface LayoutEngine {
 export const CARD = { width: 180, height: 64 };
 export const TEAM_HEADER = 36;
 const TEAM_PAD = 14;
+const COLLAPSED_HEIGHT = 76;
 
 const ROOT_OPTIONS = {
   'elk.algorithm': 'layered',
@@ -77,8 +86,8 @@ const ROOT_OPTIONS = {
   'elk.padding': '[top=16,left=16,bottom=16,right=16]',
 };
 
-const teamNodeId = (id: string) => `t:${id}`;
-const personNodeId = (id: string) => `p:${id}`;
+const nodeId = (kind: EndKind, id: string) => `${kind === 'team' ? 't' : 'p'}:${id}`;
+const teamMinWidth = (t: Team) => Math.max(160, t.title.length * 8 + 48);
 
 let defaultEngine: Promise<LayoutEngine> | undefined;
 function bundledEngine(): Promise<LayoutEngine> {
@@ -86,8 +95,15 @@ function bundledEngine(): Promise<LayoutEngine> {
   return defaultEngine;
 }
 
-/** Lay out an Org as nested Team boxes, person cards and Reporting lines. */
-export async function buildScene(org: Org, options: { engine?: LayoutEngine } = {}): Promise<Scene> {
+/**
+ * Lay out an Org as nested Team boxes, person cards, Reporting lines and Dotted lines.
+ * Each Collapsed team is drawn as one box, and lines with an end inside it end at that box instead.
+ */
+export async function buildScene(
+  org: Org,
+  collapsed: ReadonlySet<string> = new Set(),
+  options: { engine?: LayoutEngine } = {},
+): Promise<Scene> {
   const engine = options.engine ?? (await bundledEngine());
   const { teams, people } = org;
 
@@ -100,26 +116,59 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
   for (const t of teams.values()) childTeams.get(t.parent && teams.has(t.parent) ? t.parent : null)!.push(t);
   for (const p of people.values()) members.get(p.team && teams.has(p.team) ? p.team : null)!.push(p);
 
-  const personNode = (p: Person): ElkNode => ({ id: personNodeId(p.id), width: CARD.width, height: CARD.height });
-  const teamNode = (t: Team): ElkNode => ({
-    id: teamNodeId(t.id),
-    layoutOptions: {
-      'elk.padding': `[top=${TEAM_HEADER + 8},left=${TEAM_PAD},bottom=${TEAM_PAD},right=${TEAM_PAD}]`,
-      'elk.nodeSize.constraints': 'MINIMUM_SIZE',
-      'elk.nodeSize.minimum': `(${Math.max(160, t.title.length * 8 + 48)},${TEAM_HEADER + 24})`,
-    },
-    children: [...members.get(t.id)!.map(personNode), ...childTeams.get(t.id)!.map(teamNode)],
-  });
+  /** The outermost Collapsed team containing a Team (itself included), if any. */
+  const collapsedAncestor = (teamId: string | null): string | null => {
+    let found: string | null = null;
+    for (let t = teamId ? teams.get(teamId) : undefined; t; t = t.parent ? teams.get(t.parent) : undefined) {
+      if (collapsed.has(t.id)) found = t.id;
+    }
+    return found;
+  };
+  /** Where a line to this Person is drawn: their card, or the Collapsed team box hiding it. */
+  const visibleEnd = (personId: string): { kind: EndKind; id: string } => {
+    const box = collapsedAncestor(people.get(personId)!.team);
+    return box ? { kind: 'team', id: box } : { kind: 'person', id: personId };
+  };
+
+  const contentCounts = (teamId: string): { people: number; teams: number } => {
+    const total = { people: members.get(teamId)!.length, teams: 0 };
+    for (const sub of childTeams.get(teamId)!) {
+      const inner = contentCounts(sub.id);
+      total.people += inner.people;
+      total.teams += inner.teams + 1;
+    }
+    return total;
+  };
+
+  const personNode = (p: Person): ElkNode => ({ id: nodeId('person', p.id), width: CARD.width, height: CARD.height });
+  const teamNode = (t: Team): ElkNode =>
+    collapsed.has(t.id)
+      ? { id: nodeId('team', t.id), width: Math.max(200, teamMinWidth(t)), height: COLLAPSED_HEIGHT }
+      : {
+          id: nodeId('team', t.id),
+          layoutOptions: {
+            'elk.padding': `[top=${TEAM_HEADER + 8},left=${TEAM_PAD},bottom=${TEAM_PAD},right=${TEAM_PAD}]`,
+            'elk.nodeSize.constraints': 'MINIMUM_SIZE',
+            'elk.nodeSize.minimum': `(${teamMinWidth(t)},${TEAM_HEADER + 24})`,
+          },
+          children: [...members.get(t.id)!.map(personNode), ...childTeams.get(t.id)!.map(teamNode)],
+        };
 
   const edges: ElkExtendedEdge[] = [];
   const lineEnds = new Map<string, Omit<SceneLine, 'points'>>();
-  const addLine = (kind: SceneLine['kind'], from: string, to: string) => {
-    if (!people.has(from)) return;
+  const seen = new Set<string>();
+  const addLine = (kind: SceneLine['kind'], fromPerson: string, toPerson: string) => {
+    const from = visibleEnd(fromPerson);
+    const to = visibleEnd(toPerson);
+    if (from.kind === to.kind && from.id === to.id) return; // both ends hidden in the same Collapsed team
+    const key = `${kind}|${nodeId(from.kind, from.id)}|${nodeId(to.kind, to.id)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
     const id = `e${edges.length}`;
     // Reporting lines decide the top-down order; Dotted lines bend to fit around them.
     const layoutOptions = { 'elk.layered.priority.direction': kind === 'reporting' ? '10' : '0' };
-    edges.push({ id, sources: [personNodeId(from)], targets: [personNodeId(to)], layoutOptions });
-    lineEnds.set(id, { kind, from, to });
+    edges.push({ id, sources: [nodeId(from.kind, from.id)], targets: [nodeId(to.kind, to.id)], layoutOptions });
+    lineEnds.set(id, { kind, from: from.id, fromKind: from.kind, to: to.id, toKind: to.kind });
   };
   for (const p of people.values()) {
     if (p.manager) addLine('reporting', p.manager, p.id);
@@ -154,13 +203,18 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
         const t = teams.get(id)!;
         const hue = (t.colour && parseColour(t.colour)) || inherited || paletteHue(id);
         const colour = t.placeholder ? null : { ...hue, shade: depth };
+        const isCollapsed = collapsed.has(id);
         colours.set(id, colour);
-        scene.teams.push({ ...rect, id, title: t.title, depth, colour, line: t.line, placeholder: t.placeholder });
+        scene.teams.push({
+          ...rect, id, title: t.title, depth, colour, line: t.line, placeholder: t.placeholder,
+          collapsed: isCollapsed, counts: isCollapsed ? contentCounts(id) : null,
+        });
         walk(child, at, depth + 1, t.placeholder ? null : hue);
       } else {
         const p = people.get(id)!;
         scene.people.push({
-          ...rect, id, name: p.name, role: p.role, fn: p.fn, tint: (p.team && colours.get(p.team)) || null, team: p.team, line: p.line, placeholder: p.placeholder,
+          ...rect, id, name: p.name, role: p.role, fn: p.fn, tint: (p.team && colours.get(p.team)) || null,
+          team: p.team, line: p.line, placeholder: p.placeholder,
           tooltip: {
             id,
             team: p.team ? teams.get(p.team)?.title ?? p.team : null,

@@ -43,3 +43,19 @@ export interface Org {
   people: Map<string, Person>;
   problems: Problem[];
 }
+
+/** Each Team's depth in the team tree: 0 for a top-level Team. */
+export function teamDepths(org: Org): Map<string, number> {
+  const depths = new Map<string, number>();
+  const depthOf = (id: string): number => {
+    const known = depths.get(id);
+    if (known !== undefined) return known;
+    const parent = org.teams.get(id)?.parent;
+    // Parse cuts Team loops, so walking up always ends.
+    const depth = parent && org.teams.has(parent) ? depthOf(parent) + 1 : 0;
+    depths.set(id, depth);
+    return depth;
+  };
+  for (const id of org.teams.keys()) depthOf(id);
+  return depths;
+}

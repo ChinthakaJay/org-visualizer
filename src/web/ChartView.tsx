@@ -18,6 +18,7 @@ interface ChartViewProps {
   toolbar?: ReactNode;
   /** File name for SVG export. */
   exportName?: string;
+  onToggleTeam?(id: string): void;
   children?: ReactNode;
 }
 
@@ -32,7 +33,7 @@ const clampZoom = (k: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, k));
 
 /** The chart pane: a pannable, zoomable viewport over the scene, with its toolbar. */
 export const ChartView = forwardRef<ChartHandle, ChartViewProps>(function ChartView(
-  { scene, stale = false, toolbar, exportName = 'org-chart.svg', children },
+  { scene, stale = false, toolbar, exportName = 'org-chart.svg', onToggleTeam, children },
   ref,
 ) {
   const viewport = useRef<HTMLDivElement>(null);
@@ -183,7 +184,7 @@ export const ChartView = forwardRef<ChartHandle, ChartViewProps>(function ChartV
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        {scene && <Chart ref={svg} scene={scene} transform={`translate(${view.x} ${view.y}) scale(${view.k})`} />}
+        {scene && <Chart ref={svg} scene={scene} transform={`translate(${view.x} ${view.y}) scale(${view.k})`} onToggleTeam={onToggleTeam} />}
         {children}
       </div>
     </>

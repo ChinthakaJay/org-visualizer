@@ -20,6 +20,14 @@ export const CHART_CSS = `
   stroke-width: 1.2;
 }
 .chart-svg .team-title { font-size: 13px; font-weight: 650; fill: hsl(var(--h) calc(var(--s) * 0.8%) 28%); }
+.chart-svg .team-hit { fill: transparent; cursor: pointer; }
+.chart-svg .team-hit:hover { fill: hsl(var(--h) calc(var(--s) * 0.6%) 50% / 0.08); }
+.chart-svg .team-hit:focus { outline: none; }
+.chart-svg .team-hit:focus-visible { outline: none; stroke: var(--c-dotted); stroke-width: 2; }
+.chart-svg .team-chevron { font-size: 11px; fill: hsl(var(--h) calc(var(--s) * 0.6%) 40%); pointer-events: none; }
+.chart-svg .team-title, .chart-svg .team-counts { pointer-events: none; }
+.chart-svg .team-counts { font-size: 12px; fill: var(--c-muted); }
+.chart-svg .team.collapsed .team-box { stroke-width: 1.6; }
 .chart-svg .team.placeholder .team-box { fill: #8e8e93; fill-opacity: 0.06; stroke: #8e8e93; stroke-dasharray: 6 4; }
 .chart-svg .team.placeholder .team-title { fill: var(--c-muted); font-weight: 500; font-style: italic; }
 
@@ -51,6 +59,7 @@ export const CHART_CSS = `
     stroke: hsl(var(--h) calc(var(--s) * 0.55%) 42%);
   }
   .chart-svg .team-title { fill: hsl(var(--h) calc(var(--s) * 0.8%) 82%); }
+  .chart-svg .team-chevron { fill: hsl(var(--h) calc(var(--s) * 0.6%) 70%); }
   .chart-svg .card-box {
     fill: hsl(var(--h) calc(var(--s) * 0.22%) 11%);
     stroke: hsl(var(--h) calc(var(--s) * 0.3%) 34%);
