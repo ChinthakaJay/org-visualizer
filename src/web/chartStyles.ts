@@ -26,6 +26,13 @@ export const CHART_CSS = `
 .chart-svg .team-hit:focus-visible { outline: none; stroke: var(--c-dotted); stroke-width: 2; }
 .chart-svg .team-chevron { font-size: 11px; fill: hsl(var(--h) calc(var(--s) * 0.6%) 40%); pointer-events: none; }
 .chart-svg .team-title, .chart-svg .team-counts { pointer-events: none; }
+.chart-svg .team-title.link { pointer-events: auto; cursor: pointer; }
+.chart-svg .team-title.link:hover { text-decoration: underline; }
+.chart-svg .card { cursor: pointer; }
+.chart-svg .card.placeholder { cursor: default; }
+.chart-svg .highlight > .team-box, .chart-svg .highlight > .card-box {
+  stroke: var(--c-highlight); stroke-width: 3; stroke-dasharray: none;
+}
 .chart-svg .team-counts { font-size: 12px; fill: var(--c-muted); }
 .chart-svg .team.collapsed .team-box { stroke-width: 1.6; }
 .chart-svg .team.placeholder .team-box { fill: #8e8e93; fill-opacity: 0.06; stroke: #8e8e93; stroke-dasharray: 6 4; }

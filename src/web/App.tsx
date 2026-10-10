@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { parse } from '../core';
 import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
 import { ChartView, type ChartHandle } from './ChartView';
 import { Editor, type EditorHandle } from './Editor';
+import { elementForLine } from './linking';
 import { ProblemsPanel } from './ProblemsPanel';
 import { useAutosave, type SaveState } from './useAutosave';
 import { useCollapse } from './useCollapse';
@@ -28,6 +29,17 @@ function Workspace({ file }: { file: OrgFile }) {
   const org = useMemo(() => parse(text), [text]);
   const collapse = useCollapse(file.path, org);
   const { scene, stale } = useScene(org, collapse.collapsed);
+  const [cursorLine, setCursorLine] = useState(0);
+  const linked = useMemo(() => (scene ? elementForLine(org, scene, cursorLine) : null), [org, scene, cursorLine]);
+
+  // Pan to the linked element when the cursor moves to a new line (not on every redraw while typing).
+  const linkedRef = useRef(linked);
+  linkedRef.current = linked;
+  useEffect(() => {
+    if (linkedRef.current) chart.current?.reveal(linkedRef.current.rect);
+  }, [cursorLine]);
+
+  const selectLine = useCallback((line: number) => editor.current?.goToLine(line), []);
   /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
   const [conflict, setConflict] = useState<OrgFile | null>(null);
   const save = useAutosave(file, text, setConflict);
@@ -80,7 +92,13 @@ function Workspace({ file }: { file: OrgFile }) {
       )}
       <main className="panes">
         <section className="pane editor-pane">
-          <Editor ref={editor} initialText={file.text} onChange={setText} problems={org.problems} />
+          <Editor
+            ref={editor}
+            initialText={file.text}
+            onChange={setText}
+            problems={org.problems}
+            onCursorLine={setCursorLine}
+          />
           <ProblemsPanel problems={org.problems} onJump={(line) => editor.current?.goToLine(line)} />
         </section>
         <section className="pane chart-pane">
@@ -90,6 +108,8 @@ function Workspace({ file }: { file: OrgFile }) {
             stale={stale}
             exportName={exportName(file.path)}
             onToggleTeam={collapse.toggle}
+            onSelectLine={selectLine}
+            highlight={linked?.key ?? null}
             toolbar={<CollapseControls collapse={collapse} />}
           />
         </section>

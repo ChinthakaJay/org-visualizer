@@ -25,14 +25,17 @@ interface EditorProps {
   onChange?(text: string): void;
   /** Shown as lint markers on their lines. */
   problems?: Problem[];
+  /** Called with the cursor's 1-based line whenever it moves to a different line. */
+  onCursorLine?(line: number): void;
 }
 
 /** The Org file editor (CodeMirror 6). It owns its document; the parent listens and pushes replacements. */
-export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ initialText, onChange, problems = [] }, ref) {
+export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ initialText, onChange, problems = [], onCursorLine }, ref) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const handlers = useRef({ onChange });
-  handlers.current = { onChange };
+  const handlers = useRef({ onChange, onCursorLine });
+  handlers.current = { onChange, onCursorLine };
+  const cursorLine = useRef(0);
   /** Set while we replace the text ourselves, so it isn't reported as a user edit. */
   const replacing = useRef(false);
 
@@ -51,6 +54,13 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor({ in
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.updateListener.of((u) => {
             if (u.docChanged && !replacing.current) handlers.current.onChange?.(u.state.doc.toString());
+            if (u.docChanged || u.selectionSet) {
+              const line = u.state.doc.lineAt(u.state.selection.main.head).number;
+              if (line !== cursorLine.current) {
+                cursorLine.current = line;
+                handlers.current.onCursorLine?.(line);
+              }
+            }
           }),
         ],
       }),

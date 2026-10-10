@@ -9,6 +9,10 @@ interface ChartProps {
   transform: string;
   /** Collapse or expand a Team (clicking its header, or a Collapsed team's box). */
   onToggleTeam?(id: string): void;
+  /** Clicking a card or a Team's title selects its line in the Org file. */
+  onSelectLine?(line: number): void;
+  /** The element to highlight, as "person:<id>" or "team:<id>". */
+  highlight?: string | null;
 }
 
 interface Hover {
@@ -18,7 +22,7 @@ interface Hover {
 }
 
 /** Draws a scene as SVG: Team boxes parent-first, then lines, then person cards on top. */
-export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform, onToggleTeam }, ref) {
+export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scene, transform, onToggleTeam, onSelectLine, highlight = null }, ref) {
   const [hover, setHover] = useState<Hover | null>(null);
   return (
     <>
@@ -33,7 +37,13 @@ export const Chart = forwardRef<SVGSVGElement, ChartProps>(function Chart({ scen
           </marker>
         </defs>
         <g className="viewport-transform" transform={transform}>
-          <SceneContent scene={scene} onHover={setHover} onToggleTeam={onToggleTeam} />
+          <SceneContent
+            scene={scene}
+            onHover={setHover}
+            onToggleTeam={onToggleTeam}
+            onSelectLine={onSelectLine}
+            highlight={highlight}
+          />
         </g>
       </svg>
       {hover && <Tooltip {...hover} />}
@@ -46,21 +56,44 @@ interface SceneContentProps {
   scene: Scene;
   onHover(h: Hover | null): void;
   onToggleTeam?(id: string): void;
+  onSelectLine?(line: number): void;
+  highlight: string | null;
 }
 
-const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam }: SceneContentProps) {
+const SceneContent = memo(function SceneContent({ scene, onHover, onToggleTeam, onSelectLine, highlight }: SceneContentProps) {
   return (
     <>
-      {scene.teams.map((t) => <TeamBoxView key={t.id} team={t} onToggle={onToggleTeam} />)}
+      {scene.teams.map((t) => (
+        <TeamBoxView
+          key={t.id}
+          team={t}
+          onToggle={onToggleTeam}
+          onSelectLine={onSelectLine}
+          highlighted={highlight === `team:${t.id}`}
+        />
+      ))}
       {scene.lines.map((l, i) => <LineView key={i} line={l} />)}
       {scene.people.map((p) => (
-        <PersonCardView key={p.id} person={p} onHover={(e) => onHover(e && { person: p, x: e.clientX, y: e.clientY })} />
+        <PersonCardView
+          key={p.id}
+          person={p}
+          highlighted={highlight === `person:${p.id}`}
+          onSelectLine={onSelectLine}
+          onHover={(e) => onHover(e && { person: p, x: e.clientX, y: e.clientY })}
+        />
       ))}
     </>
   );
 });
 
-function TeamBoxView({ team, onToggle }: { team: TeamBox; onToggle?(id: string): void }) {
+interface TeamBoxViewProps {
+  team: TeamBox;
+  highlighted: boolean;
+  onToggle?(id: string): void;
+  onSelectLine?(line: number): void;
+}
+
+function TeamBoxView({ team, highlighted, onToggle, onSelectLine }: TeamBoxViewProps) {
   const { x, y, width, height } = team;
   const toggle = onToggle && (() => onToggle(team.id));
   const label = `${team.collapsed ? 'Expand' : 'Collapse'} ${team.title}`;
@@ -72,7 +105,7 @@ function TeamBoxView({ team, onToggle }: { team: TeamBox; onToggle?(id: string):
   };
   return (
     <g
-      className={`team${team.placeholder ? ' placeholder' : ''}${team.collapsed ? ' collapsed' : ''}`}
+      className={`team${team.placeholder ? ' placeholder' : ''}${team.collapsed ? ' collapsed' : ''}${highlighted ? ' highlight' : ''}`}
       data-team={team.id}
       style={colourVars(team.colour)}
     >
@@ -91,7 +124,20 @@ function TeamBoxView({ team, onToggle }: { team: TeamBox; onToggle?(id: string):
         <title>{label}</title>
       </rect>
       <text className="team-chevron" x={x + 12} y={y + TEAM_HEADER / 2 + 5}>{team.collapsed ? '▸' : '▾'}</text>
-      <text className="team-title" x={x + 28} y={y + TEAM_HEADER / 2 + 5}>{clip(team.title, Math.floor((width - 40) / 7.5))}</text>
+      <text
+        className={`team-title${team.line !== null && onSelectLine ? ' link' : ''}`}
+        x={x + 28}
+        y={y + TEAM_HEADER / 2 + 5}
+        onClick={(e) => {
+          // The title is the jump-to-line target; the rest of the header collapses or expands.
+          if (team.line === null || !onSelectLine) return;
+          e.stopPropagation();
+          onSelectLine(team.line);
+        }}
+      >
+        {clip(team.title, Math.floor((width - 40) / 7.5))}
+        {team.line !== null && <title>Go to line {team.line}</title>}
+      </text>
       {team.counts && (
         <text className="team-counts" x={x + 28} y={y + TEAM_HEADER + 18}>
           {countLabel(team.counts.people, 'Person', 'People')}
@@ -106,15 +152,23 @@ const countLabel = (n: number, one: string, many: string) => `${n} ${n === 1 ? o
 
 const BADGE_CHAR_WIDTH = 6.4;
 
-function PersonCardView({ person, onHover }: { person: PersonCard; onHover(e: React.MouseEvent | null): void }) {
+interface PersonCardViewProps {
+  person: PersonCard;
+  highlighted: boolean;
+  onSelectLine?(line: number): void;
+  onHover(e: React.MouseEvent | null): void;
+}
+
+function PersonCardView({ person, highlighted, onSelectLine, onHover }: PersonCardViewProps) {
   const { x, y, width, height } = person;
   const fn = person.fn ? clip(person.fn, 12) : null;
   const badgeWidth = fn ? fn.length * BADGE_CHAR_WIDTH + 12 : 0;
   const roleX = x + 12 + (fn ? badgeWidth + 6 : 0);
   return (
     <g
-      className={`card${person.placeholder ? ' placeholder' : ''}`}
+      className={`card${person.placeholder ? ' placeholder' : ''}${highlighted ? ' highlight' : ''}`}
       data-person={person.id}
+      onClick={() => person.line !== null && onSelectLine?.(person.line)}
       style={colourVars(person.tint)}
       onMouseMove={onHover}
       onMouseLeave={() => onHover(null)}
