@@ -234,7 +234,9 @@ function PersonCardView({ person, highlighted, onSelectLine, onDefine, onHover }
 }
 
 function LineView({ line }: { line: SceneLine }) {
-  return <path className={`line ${line.kind}`} d={pathOf(line.points)} markerEnd={`url(#arrow-${line.kind})`} />;
+  // Lines run from the Manager to the report; the arrowhead sits at the Manager's end (reversed by
+  // orient="auto-start-reverse"), so a line reads "reports to".
+  return <path className={`line ${line.kind}`} d={pathOf(line.points)} markerStart={`url(#arrow-${line.kind})`} />;
 }
 
 function Tooltip({ person, x, y }: Hover) {
