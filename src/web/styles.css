@@ -105,3 +105,27 @@ button, input, select { font: inherit; color: inherit; }
   border-radius: 6px; padding: 3px 10px; cursor: pointer;
 }
 .conflict-banner button:hover, .toolbar button:hover { border-color: var(--accent); }
+
+/* ---- Problems and status bar ---- */
+.problems { border-top: 1px solid var(--rule); max-height: 40%; display: flex; flex-direction: column; min-height: 0; }
+.problems-toggle {
+  all: unset; cursor: pointer; padding: 6px 12px; font-size: 12px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.problems-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.problems-list { list-style: none; margin: 0; padding: 0 6px 6px; overflow: auto; }
+.problems-empty { padding: 4px 8px; color: var(--muted); font-size: 13px; }
+.problem {
+  all: unset; box-sizing: border-box; display: grid; grid-template-columns: 16px max-content 1fr; gap: 8px;
+  width: 100%; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.problem:hover, .problem:focus-visible { background: var(--accent-soft); }
+.problem-line { color: var(--muted); font: 12px/1.6 var(--mono); }
+.problem.error .problem-icon { color: var(--err); }
+.problem.warning .problem-icon { color: var(--warn); }
+.problem.info .problem-icon { color: var(--accent); }
+
+.status-bar {
+  display: flex; gap: 16px; padding: 4px 14px; min-height: 26px;
+  font-size: 12px; color: var(--muted); border-top: 1px solid var(--rule); background: var(--panel);
+}

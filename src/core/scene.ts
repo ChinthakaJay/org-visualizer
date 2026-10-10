@@ -38,6 +38,8 @@ export interface Scene {
   teams: TeamBox[];
   people: PersonCard[];
   lines: SceneLine[];
+  /** For the status bar. People and Teams exclude Placeholders, which are counted together. */
+  counts: { people: number; teams: number; placeholders: number };
 }
 
 /** The slice of the elkjs API that Build scene needs, so the browser can pass a Web Worker-backed instance. */
@@ -112,7 +114,13 @@ export async function buildScene(org: Org, options: { engine?: LayoutEngine } = 
   const laid = await engine.layout(graph);
 
   const origin = new Map<string, Point>([['root', { x: 0, y: 0 }]]);
-  const scene: Scene = { width: laid.width ?? 0, height: laid.height ?? 0, teams: [], people: [], lines: [] };
+  const all = [...teams.values(), ...people.values()];
+  const counts = {
+    people: [...people.values()].filter((p) => !p.placeholder).length,
+    teams: [...teams.values()].filter((t) => !t.placeholder).length,
+    placeholders: all.filter((x) => x.placeholder).length,
+  };
+  const scene: Scene = { width: laid.width ?? 0, height: laid.height ?? 0, teams: [], people: [], lines: [], counts };
 
   const walk = (node: ElkNode, offset: Point, depth: number) => {
     for (const child of node.children ?? []) {

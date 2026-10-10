@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fetchOrgFile, watchOrgFile, type OrgFile } from './api';
 import { Chart } from './Chart';
 import { Editor, type EditorHandle } from './Editor';
+import { ProblemsPanel } from './ProblemsPanel';
 import { useAutosave, type SaveState } from './useAutosave';
 import { useScene } from './useScene';
 
@@ -21,7 +22,7 @@ export function App() {
 function Workspace({ file }: { file: OrgFile }) {
   const editor = useRef<EditorHandle>(null);
   const [text, setText] = useState(file.text);
-  const { scene, stale } = useScene(text);
+  const { org, scene, stale } = useScene(text);
   /** What's on disk when it differs from our unsaved edits; drives the "Reload / Keep mine" banner. */
   const [conflict, setConflict] = useState<OrgFile | null>(null);
   const save = useAutosave(file, text, setConflict);
@@ -74,16 +75,28 @@ function Workspace({ file }: { file: OrgFile }) {
       )}
       <main className="panes">
         <section className="pane editor-pane">
-          <Editor ref={editor} initialText={file.text} onChange={setText} />
+          <Editor ref={editor} initialText={file.text} onChange={setText} problems={org.problems} />
+          <ProblemsPanel problems={org.problems} onJump={(line) => editor.current?.goToLine(line)} />
         </section>
         <section className="pane chart-pane">
           {stale && <div className="stale-badge" role="status">Couldn't redraw. Showing the last good chart.</div>}
           <div className={`chart-viewport${stale ? ' stale' : ''}`}>{scene && <Chart scene={scene} />}</div>
         </section>
       </main>
+      <footer className="status-bar">
+        {scene && (
+          <>
+            <span>{plural(scene.counts.people, 'Person', 'People')}</span>
+            <span>{plural(scene.counts.teams, 'Team', 'Teams')}</span>
+            <span>{plural(scene.counts.placeholders, 'Placeholder', 'Placeholders')}</span>
+          </>
+        )}
+      </footer>
     </div>
   );
 }
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 const SAVE_LABELS: Record<SaveState, string> = {
   saved: 'Saved',
