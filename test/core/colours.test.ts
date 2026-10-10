@@ -76,3 +76,48 @@ describe('Team colours', () => {
     expect(card(scene, 'z').tint).toBeNull();
   });
 });
+
+describe('Function colours', () => {
+  const fnColourOf = async (...ls: string[]) => {
+    const scene = await sceneOf(...ls);
+    return (id: string) => card(scene, id).fnColour;
+  };
+
+  it('gives every Person with the same Function the same colour, ignoring case', async () => {
+    const of = await fnColourOf('a : A | fn=eng', 'b : B | fn=Eng', 'c : C | fn=ENG ');
+    expect(of('a')).toMatchObject({ hue: expect.any(Number), saturation: expect.any(Number) });
+    expect(of('b')).toEqual(of('a'));
+    expect(of('c')).toEqual(of('a'));
+  });
+
+  it("doesn't depend on the order of lines or which Team a Person is in", async () => {
+    const a = await fnColourOf('team t : T', 'x : X | fn=eng', 'y : Y | team=t | fn=ops');
+    const b = await fnColourOf('y : Y | fn=ops', 'team t : T', 'x : X | team=t | fn=eng');
+    expect(b('x')).toEqual(a('x'));
+    expect(b('y')).toEqual(a('y'));
+  });
+
+  it('gives up to twelve different Functions twelve different colours', async () => {
+    const fns = ['eng', 'product', 'design', 'data', 'ops', 'sales', 'legal', 'finance', 'hr', 'support', 'research', 'marketing'];
+    const of = await fnColourOf(...fns.map((fn, i) => `p${i} : P | fn=${fn}`));
+    const colours = new Set(fns.map((_, i) => JSON.stringify(of(`p${i}`))));
+    expect(colours.size).toBe(12);
+  });
+
+  it('hands out colours by Function name, so the first few in use are far apart', async () => {
+    const of = await fnColourOf('a : A | fn=eng', 'b : B | fn=data', 'c : C | fn=design');
+    const hues = ['b', 'c', 'a'].map((id) => of(id)!.hue); // data, design, eng
+    for (let i = 0; i < hues.length; i++) {
+      for (let j = i + 1; j < hues.length; j++) {
+        const gap = Math.abs(hues[i] - hues[j]);
+        expect(Math.min(gap, 360 - gap)).toBeGreaterThanOrEqual(60);
+      }
+    }
+  });
+
+  it('leaves Function colour empty for a Person without a Function', async () => {
+    const of = await fnColourOf('a : A', 'b : B | reports=z');
+    expect(of('a')).toBeNull();
+    expect(of('z')).toBeNull();
+  });
+});

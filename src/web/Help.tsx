@@ -169,7 +169,7 @@ function SyntaxReference() {
         <li><code>team=</code> puts the Person in a Team.</li>
         <li><code>reports=</code> is their Manager, drawn as a Reporting line. Leave it out, or write <code>reports=?</code>, when you don't know.</li>
         <li><code>role=</code> is the job title, shown on the card.</li>
-        <li><code>fn=</code> is the Function, the kind of work (for example <code>eng</code>, <code>product</code>, <code>ops</code>). Any word works; it shows as a badge.</li>
+        <li><code>fn=</code> is the Function, the kind of work (for example <code>eng</code>, <code>product</code>, <code>ops</code>). Any word works; it shows as a badge, and every Person with the same Function gets the same badge colour.</li>
         <li>Any other <code>key=value</code> is kept as a note and shown when you hover the card.</li>
       </ul>
       <Code>{'alice : Alice Smith | team=payments | reports=bob | role=EM | fn=eng | met=2024 offsite'}</Code>

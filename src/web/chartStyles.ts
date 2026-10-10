@@ -3,7 +3,8 @@
  * SVG looks the same on its own, including the light or dark theme.
  *
  * Team colours arrive as custom properties on each Team box and card: --h (hue), --s (saturation)
- * and --shade (depth, capped). Elements without them are neutral grey.
+ * and --shade (depth, capped). Elements without them are neutral grey. A Function badge has its own
+ * hue and saturation, --fh and --fs.
  */
 export const CHART_CSS = `
 .chart-svg {
@@ -52,8 +53,12 @@ export const CHART_CSS = `
 }
 .chart-svg .card-name { font-size: 13px; font-weight: 600; fill: var(--c-ink); }
 .chart-svg .card-role { font-size: 12px; fill: var(--c-muted); }
-.chart-svg .fn-badge rect { fill: hsl(var(--h) calc(var(--s) * 0.4%) 50% / 0.12); }
-.chart-svg .fn-badge text { font-size: 10.5px; font-weight: 600; fill: var(--c-muted); letter-spacing: 0.02em; }
+.chart-svg .fn-badge { --fh: 0; --fs: 0; }
+.chart-svg .fn-badge rect {
+  fill: hsl(var(--fh) calc(var(--fs) * 1%) 50% / 0.14);
+  stroke: hsl(var(--fh) calc(var(--fs) * 1%) 45% / 0.55); stroke-width: 1;
+}
+.chart-svg .fn-badge text { font-size: 10.5px; font-weight: 600; fill: hsl(var(--fh) calc(var(--fs) * 1%) 30%); letter-spacing: 0.02em; }
 .chart-svg .card.placeholder .card-box { fill: transparent; stroke: #8e8e93; stroke-dasharray: 5 4; }
 .chart-svg .card.placeholder .card-name { fill: var(--c-muted); font-weight: 500; }
 
@@ -78,6 +83,10 @@ export const CHART_CSS = `
     fill: hsl(var(--h) calc(var(--s) * 0.22%) 11%);
     stroke: hsl(var(--h) calc(var(--s) * 0.3%) 34%);
   }
-  .chart-svg .fn-badge rect { fill: hsl(var(--h) calc(var(--s) * 0.4%) 70% / 0.14); }
+  .chart-svg .fn-badge rect {
+    fill: hsl(var(--fh) calc(var(--fs) * 1%) 62% / 0.16);
+    stroke: hsl(var(--fh) calc(var(--fs) * 1%) 65% / 0.5);
+  }
+  .chart-svg .fn-badge text { fill: hsl(var(--fh) calc(var(--fs) * 1%) 80%); }
 }
 `;
