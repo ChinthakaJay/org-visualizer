@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Org Chart Prototype</title>
+<!--
+  PROTOTYPE — throwaway. Question: does a flat "one fact per line" text file, with two
+  independent trees (person → manager, team → parent team), let every org change be a
+  one-line edit while still drawing nested team boxes? See docs/research/text-to-org-chart-tools.md.
+  The <script id="org-model"> block is pure (no DOM) and is the bit worth lifting out.
+-->
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e2e2e0;
+    --accent: #2f6fdf; --accent-soft: #e8effc; --warn: #b45309; --warn-soft: #fef3e2;
+    --err: #b42318; --err-soft: #fdecea; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618; --panel: #1f1f22; --ink: #ececee; --muted: #9a9aa2; --line: #333338;
+      --accent: #7aa7ff; --accent-soft: #1f2a40; --warn: #f0b35a; --warn-soft: #3a2c16;
+      --err: #ff8a80; --err-soft: #3d1d1b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 24px 8px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); max-width: 900px; }
+  main { display: grid; grid-template-columns: minmax(320px, 38%) 1fr; gap: 16px; padding: 16px 24px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding: 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .panel h2 { margin: 0; padding: 10px 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+              color: var(--muted); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  .panel h2 .spacer { flex: 1; }
+  textarea { width: 100%; height: 460px; border: 0; resize: vertical; padding: 12px 14px; background: var(--panel);
+             color: var(--ink); font: 13px/1.6 var(--mono); outline: none; white-space: pre; tab-size: 2; }
+  #diagram { height: 520px; overflow: auto; padding: 12px; }
+  #diagram svg { max-width: none !important; transform-origin: 0 0; }
+  #diagram.stale { opacity: .45; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .4; cursor: default; }
+  .below { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; padding: 0 24px 24px; }
+  @media (max-width: 860px) { .below { grid-template-columns: 1fr; padding: 0 16px 16px; } }
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px 0; }
+  .tabs button { border-radius: 6px 6px 0 0; border-bottom: 0; }
+  .tabs button.on { background: var(--accent-soft); border-color: var(--accent); }
+  .scenario { padding: 12px 14px 14px; border-top: 1px solid var(--line); }
+  .scenario p { margin: 0 0 10px; }
+  .steps { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .steps .done { opacity: .55; }
+  .change { margin: 10px 14px 14px; padding: 10px 12px; border-radius: 8px; background: var(--accent-soft);
+            font: 12px/1.6 var(--mono); white-space: pre-wrap; display: none; }
+  .change .minus { color: var(--err); } .change .plus { color: #1a7f37; }
+  @media (prefers-color-scheme: dark) { .change .plus { color: #6fdc8c; } }
+  .state { padding: 12px 14px; }
+  .state dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 10px; }
+  .state dt { color: var(--muted); }
+  .state dd { margin: 0; }
+  .tree { font: 12.5px/1.7 var(--mono); margin: 0 0 10px; white-space: pre; overflow-x: auto; }
+  .issue { padding: 6px 10px; border-radius: 6px; margin-bottom: 6px; font-size: 13px; }
+  .issue.warn { background: var(--warn-soft); color: var(--warn); }
+  .issue.error { background: var(--err-soft); color: var(--err); }
+  .issue.info { background: var(--accent-soft); }
+  details { padding: 0 14px 12px; }
+  details pre { font: 12px/1.5 var(--mono); max-height: 260px; overflow: auto; background: var(--bg);
+                padding: 8px; border-radius: 6px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Org chart from a text file: prototype</h1>
+  <p>Type in the left pane; the chart redraws as you type. Each line is one fact: a team and its parent team,
+     or a person with their team and manager. Use the walkthroughs below to see whether every real-world change
+     (new manager, team move, re-org, someone you only half know) stays a one-line edit.</p>
+</header>
+
+<main>
+  <section class="panel">
+    <h2>org.txt <span class="spacer"></span>
+      <button id="reset" title="Restore the sample file">Reset sample</button></h2>
+    <textarea id="src" spellcheck="false"></textarea>
+  </section>
+  <section class="panel">
+    <h2>Chart <span class="spacer"></span>
+      <span id="status" class="muted" style="text-transform:none;letter-spacing:0"></span>
+      <button id="zout">−</button><button id="zfit">Fit</button><button id="zin">+</button></h2>
+    <div id="diagram"></div>
+  </section>
+</main>
+
+<div class="below">
+  <section class="panel">
+    <h2>Walkthroughs</h2>
+    <div class="tabs" id="tabs"></div>
+    <div class="scenario" id="scenario"></div>
+    <div class="change" id="change"></div>
+  </section>
+  <section class="panel">
+    <h2>What the file says</h2>
+    <div class="state" id="state"></div>
+    <details><summary class="muted">Generated Mermaid text</summary><pre id="mmd"></pre></details>
+  </section>
+</div>
+
+<!-- ===================== Pure model: no DOM in here ===================== -->
+<script id="org-model">
+const OrgModel = (() => {
+  const ID = /^[A-Za-z_][\w.-]*$/;
+
+  /** Parse org.txt into two flat maps plus a list of issues (each tied to a line). */
+  function parse(text) {
+    const teams = new Map(), people = new Map(), issues = [];
+    text.split('\n').forEach((raw, i) => {
+      const lineNo = i + 1;
+      const line = raw.replace(/(^|\s)#.*$/, '').trim();
+      if (!line) return;
+      const [head, ...fields] = line.split('|').map(s => s.trim());
+      const attrs = {};
+      for (const f of fields) {
+        if (!f) continue;
+        const m = f.match(/^([\w-]+)\s*=\s*(.*)$/);
+        if (m) attrs[m[1].toLowerCase()] = m[2].trim();
+        else issues.push({ level: 'error', line: lineNo, msg: `"${f}" isn't key=value` });
+      }
+      const m = head.match(/^(?:(team)\s+)?(\S+)\s*(?::\s*(.*))?$/);
+      if (!m || !ID.test(m[2])) {
+        issues.push({ level: 'error', line: lineNo, msg: `Can't read "${head}". Expected "id : Name" or "team id : Title"` });
+        return;
+      }
+      const isTeam = !!m[1], id = m[2], label = (m[3] || '').trim() || id;
+      const map = isTeam ? teams : people;
+      if (map.has(id)) {
+        issues.push({ level: 'error', line: lineNo, msg: `${isTeam ? 'Team' : 'Person'} "${id}" is already defined on line ${map.get(id).line}; this line is ignored` });
+        return;
+      }
+      map.set(id, { id, label, attrs, line: lineNo, ghost: false });
+    });
+    return resolve(teams, people, issues);
+  }
+
+  /** Link references, create ghosts for unknown ids, and break cycles. */
+  function resolve(teams, people, issues) {
+    const ghostTeam = (id, why, line) => {
+      if (!teams.has(id)) {
+        teams.set(id, { id, label: id, attrs: {}, line: null, ghost: true, parent: null });
+        issues.push({ level: 'info', line, msg: `Team "${id}" isn't defined (${why}), so it's drawn as a dashed placeholder` });
+      }
+    };
+    for (const t of [...teams.values()]) {
+      t.parent = t.attrs.parent || null;
+      if (t.parent) ghostTeam(t.parent, `parent of ${t.id}`, t.line);
+    }
+    // A team can't be inside itself: if walking up from t comes back to t, cut t's parent link.
+    for (const t of teams.values()) {
+      const seen = new Set([t.id]);
+      let cur = t;
+      while (cur.parent) {
+        if (cur.parent === t.id) {
+          issues.push({ level: 'error', line: t.line, msg: `Team loop: ${[...seen].join(' → ')} → ${t.id}. "${t.id}" is shown at top level until fixed` });
+          t.parent = null;
+          break;
+        }
+        if (seen.has(cur.parent)) break; // t leads into a loop it isn't part of; that loop's own walk handles it
+        seen.add(cur.parent);
+        cur = teams.get(cur.parent);
+      }
+    }
+    for (const p of [...people.values()]) {
+      if (p.ghost) continue;
+      p.team = p.attrs.team || null;
+      if (p.team) ghostTeam(p.team, `team of ${p.id}`, p.line);
+      const r = p.attrs.reports;
+      p.reports = r && r !== '?' ? r : null;
+      if (p.reports === p.id) {
+        issues.push({ level: 'error', line: p.line, msg: `${p.id} reports to themselves` });
+        p.reports = null;
+      } else if (p.reports && !people.has(p.reports)) {
+        people.set(p.reports, { id: p.reports, label: p.reports, attrs: {}, line: null, ghost: true, team: null, reports: null });
+        issues.push({ level: 'info', line: p.line, msg: `Manager "${p.reports}" isn't listed yet, so they're drawn as a dashed placeholder` });
+      }
+    }
+    const loopsSeen = new Set();
+    for (const p of people.values()) {
+      const seen = new Set([p.id]);
+      let cur = p;
+      while (cur.reports) {
+        if (seen.has(cur.reports)) {
+          const key = [...seen].sort().join();
+          if (cur.reports === p.id && !loopsSeen.has(key)) {
+            loopsSeen.add(key);
+            issues.push({ level: 'warn', line: p.line, msg: `Reporting loop: ${[...seen].join(' → ')} → ${p.id}` });
+          }
+          break;
+        }
+        seen.add(cur.reports);
+        cur = people.get(cur.reports);
+      }
+    }
+    return { teams, people, issues };
+  }
+
+  /** Children lists for the team tree (teams + people placed directly in each team). */
+  function teamTree(model) {
+    const kids = new Map([[null, { teams: [], people: [] }]]);
+    for (const t of model.teams.values()) kids.set(t.id, { teams: [], people: [] });
+    for (const t of model.teams.values()) kids.get(t.parent).teams.push(t);
+    for (const p of model.people.values()) kids.get(p.team || null).people.push(p);
+    return kids;
+  }
+
+  const esc = s => String(s).replace(/"/g, '#quot;');
+  const FILLS = ['#eef3fb', '#e3ecf9', '#d8e4f6', '#cddcf2'];
+
+  /** Emit Mermaid flowchart text with properly nested subgraphs. */
+  function toMermaid(model) {
+    const kids = teamTree(model);
+    const out = ['flowchart TB'], styles = [];
+    const personNode = p => {
+      const role = p.attrs.role ? `<br/><small>${esc(p.attrs.role)}</small>` : '';
+      return `p_${p.id}["${esc(p.label)}${role}"]`;
+    };
+    const emit = (teamId, depth) => {
+      const pad = '  '.repeat(depth + 1);
+      const k = kids.get(teamId);
+      for (const p of k.people) out.push(pad + personNode(p));
+      for (const t of k.teams) {
+        out.push(`${pad}subgraph t_${t.id}["${esc(t.label)}"]`);
+        out.push(`${pad}  direction TB`);
+        emit(t.id, depth + 1);
+        out.push(`${pad}end`);
+        styles.push(`  style t_${t.id} fill:${FILLS[Math.min(depth, FILLS.length - 1)]},stroke:#7d93b8,color:#1d1d1f${t.ghost ? ',stroke-dasharray:5 4' : ''}`);
+      }
+    };
+    emit(null, 0);
+    for (const p of model.people.values()) if (p.reports) out.push(`  p_${p.reports} --> p_${p.id}`);
+    out.push('  linkStyle default stroke:#4a5a78,stroke-width:1.6px');
+    out.push('  classDef person fill:#ffffff,stroke:#4a5a78,color:#1d1d1f');
+    out.push('  classDef ghost fill:#ffffff,stroke:#9a9aa2,stroke-dasharray:5 4,color:#6b6b70');
+    const real = [...model.people.values()].filter(p => !p.ghost).map(p => 'p_' + p.id);
+    const ghosts = [...model.people.values()].filter(p => p.ghost).map(p => 'p_' + p.id);
+    if (real.length) out.push(`  class ${real.join(',')} person`);
+    if (ghosts.length) out.push(`  class ${ghosts.join(',')} ghost`);
+    return out.concat(styles).join('\n');
+  }
+
+  /** Text tree of teams for the state panel. */
+  function describeTeams(model) {
+    const kids = teamTree(model), lines = [];
+    const walk = (id, depth) => {
+      for (const t of kids.get(id).teams) {
+        const ppl = kids.get(t.id).people.map(p => p.label).join(', ');
+        lines.push(`${'  '.repeat(depth)}▸ ${t.label}${t.ghost ? ' (placeholder)' : ''}${ppl ? ': ' + ppl : ''}`);
+        walk(t.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    const loose = kids.get(null).people.map(p => p.label + (p.ghost ? '?' : ''));
+    if (loose.length) lines.push(`(no team): ${loose.join(', ')}`);
+    return lines.join('\n');
+  }
+
+  /** One-line edit: set key=value on the line defining `id`. Returns the new text and the before/after line. */
+  function setField(text, kind, id, key, value) {
+    const lines = text.split('\n');
+    const re = kind === 'team' ? new RegExp(`^\\s*team\\s+${id}\\b`) : new RegExp(`^\\s*${id}\\s*(:|\\||$)`);
+    const i = lines.findIndex(l => re.test(l));
+    if (i < 0) return { text, line: null };
+    const before = lines[i];
+    const [body, comment = ''] = before.split(/(?=\s#)/);
+    // Keep column alignment: the new value takes over the old value's padding where it fits.
+    const fieldRe = new RegExp(`(\\|\\s*${key}\\s*=\\s*)([^|\\s]*)(\\s*)(?=\\||$)`);
+    const m = body.match(fieldRe);
+    let after;
+    if (m) {
+      const width = m[2].length + m[3].length;
+      const pad = m[3].length === 0 ? '' : ' '.repeat(Math.max(1, width - value.length));
+      after = body.replace(fieldRe, `$1${value}${pad}`);
+    } else {
+      after = body.replace(/\s*$/, ` | ${key}=${value}`) + (comment ? '  ' : '');
+    }
+    lines[i] = after + comment;
+    return { text: lines.join('\n'), line: i + 1, before, after: lines[i] };
+  }
+
+  /** Append a line. */
+  function addLine(text, line) {
+    const t = text.replace(/\n*$/, '');
+    return { text: `${t}\n${line}\n`, line: t.split('\n').length + 1, before: null, after: line };
+  }
+
+  return { parse, toMermaid, describeTeams, setField, addLine };
+})();
+</script>
+
+<!-- ===================== Page shell (throwaway) ===================== -->
+<script type="module">
+import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@12.1.0/dist/mermaid.esm.min.mjs';
+
+const SAMPLE = `# org.txt: one fact per line, order doesn't matter
+# teams:   team <id> : <Title> | parent=<team-id>
+team fintech  : FinTech
+team platform : Platform
+team payments : Payments  | parent=fintech
+team risk     : Risk      | parent=fintech
+team cards    : Cards     | parent=payments
+
+# people:  <id> : <Name> | team=<team-id> | reports=<person-id> | role=...
+bob   : Bob Jones   | team=fintech  | role=Director
+alice : Alice Smith | team=payments | reports=bob   | role=EM
+dan   : Dan Ruiz    | team=cards    | reports=alice
+gia   : Gia Lam     | team=cards    | reports=alice
+carol : Carol Lee   | team=risk     | reports=bob
+eve   : Eve Park    | team=risk     | reports=frank   # frank not listed yet
+hal   : Hal Ng      | team=platform | reports=carol   # reports across teams
+zoe   : Zoe Kim     | reports=?                       # team and manager unknown
+`;
+
+const M = OrgModel;
+const SCENARIOS = [
+  { name: 'New manager', desc: 'Alice used to report to Bob; after a shuffle she reports to Carol. Watch the arrow move. Alice stays in Payments, because team and manager are separate facts.',
+    steps: [{ label: 'Alice now reports to Carol', run: t => M.setField(t, 'person', 'alice', 'reports', 'carol') }] },
+  { name: 'Person changes team', desc: 'Eve moves from Risk to Payments but keeps her manager. Her box jumps into Payments and her manager arrow now crosses team borders.',
+    steps: [{ label: 'Eve moves to Payments', run: t => M.setField(t, 'person', 'eve', 'team', 'payments') }] },
+  { name: 'Team re-org', desc: 'Whole teams move, with everyone in them. Each move is one edit to the team line; nobody\'s own line changes.',
+    steps: [
+      { label: 'Cards moves under Platform', run: t => M.setField(t, 'team', 'cards', 'parent', 'platform') },
+      { label: 'Risk moves under Payments', run: t => M.setField(t, 'team', 'risk', 'parent', 'payments') },
+      { label: 'A new top-level group "Group Tech" contains FinTech and Platform', run: t => {
+          let r = M.addLine(t, 'team group  : Group Tech');
+          r = M.setField(r.text, 'team', 'fintech', 'parent', 'group');
+          r = M.setField(r.text, 'team', 'platform', 'parent', 'group');
+          return { text: r.text, line: null, note: '+1 new team line, and 1 parent= edit each on FinTech and Platform' };
+        } },
+    ] },
+  { name: 'Partial knowledge', desc: 'You meet someone whose manager and team you only know by name. They appear as dashed placeholders; once you add those lines, the placeholders become real.',
+    steps: [
+      { label: 'Add Ivy (team "ml", reports to "kai"; neither is listed)', run: t => M.addLine(t, 'ivy   : Ivy Chen    | team=ml | reports=kai') },
+      { label: 'Now you learn about Kai', run: t => M.addLine(t, 'kai   : Kai Wu      | team=ml | role=Head of ML') },
+      { label: 'And that ML sits under Platform', run: t => M.addLine(t, 'team ml       : Machine Learning | parent=platform') },
+      { label: 'And who Frank (Eve\'s manager) is', run: t => M.addLine(t, 'frank : Frank Ode   | team=risk | role=Risk Lead') },
+    ] },
+  { name: 'Mistakes', desc: 'What happens when the file says something impossible or misspelt. The chart should still draw, and the panel on the right should explain the problem.',
+    steps: [
+      { label: 'Typo: Dan\'s team is "paymnts"', run: t => M.setField(t, 'person', 'dan', 'team', 'paymnts') },
+      { label: 'Loop: FinTech is put inside Cards (which is inside FinTech)', run: t => M.setField(t, 'team', 'fintech', 'parent', 'cards') },
+      { label: 'Loop: Bob reports to Dan (who reports up to Bob)', run: t => M.setField(t, 'person', 'bob', 'reports', 'dan') },
+      { label: 'Duplicate: a second line for Alice', run: t => M.addLine(t, 'alice : Alice Smith | team=risk') },
+    ] },
+];
+
+const $ = id => document.getElementById(id);
+const src = $('src');
+let zoom = 1, renderSeq = 0, active = 0, stepIdx = 0;
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: dark ? 'dark' : 'default',
+  flowchart: { htmlLabels: true, curve: 'basis' }, layout: 'dagre' });
+
+async function update() {
+  const seq = ++renderSeq;
+  try {
+    const model = M.parse(src.value);
+    const code = M.toMermaid(model);
+    $('mmd').textContent = code;
+    renderState(model);
+    const { svg } = await mermaid.render('org' + seq, code);
+    if (seq !== renderSeq) return;
+    $('diagram').innerHTML = svg;
+    // Mermaid sizes the SVG to 100% of the pane; pin it to its natural size so zoom is predictable.
+    const el = $('diagram').querySelector('svg'), vb = el.viewBox.baseVal;
+    el.setAttribute('width', vb.width); el.setAttribute('height', vb.height);
+    el.style.maxWidth = 'none';
+    $('diagram').classList.remove('stale');
+    $('status').textContent = '';
+    applyZoom();
+  } catch (e) {
+    if (seq !== renderSeq) return;
+    $('diagram').classList.add('stale');
+    $('status').textContent = 'Render failed; showing last good chart';
+    console.error(e);
+  }
+}
+
+function renderState(model) {
+  const real = [...model.people.values()].filter(p => !p.ghost).length;
+  const ghostP = model.people.size - real;
+  const realT = [...model.teams.values()].filter(t => !t.ghost).length;
+  const edges = [...model.people.values()].filter(p => p.reports).length;
+  const issues = model.issues.map(i =>
+    `<div class="issue ${i.level}">${i.line ? `<b>Line ${i.line}:</b> ` : ''}${escapeHtml(i.msg)}</div>`).join('');
+  $('state').innerHTML = `
+    <dl>
+      <dt>People</dt><dd>${real}${ghostP ? ` <span class="muted">+ ${ghostP} placeholder</span>` : ''}</dd>
+      <dt>Teams</dt><dd>${realT}${model.teams.size - realT ? ` <span class="muted">+ ${model.teams.size - realT} placeholder</span>` : ''}</dd>
+      <dt>Reporting lines</dt><dd>${edges}</dd>
+    </dl>
+    <div class="tree">${escapeHtml(M.describeTeams(model))}</div>
+    ${issues || '<div class="muted">No problems found.</div>'}`;
+}
+
+const escapeHtml = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]);
+
+function applyZoom() {
+  const svg = $('diagram').querySelector('svg');
+  if (!svg) return;
+  const vb = svg.viewBox.baseVal;
+  svg.setAttribute('width', vb.width * zoom); svg.setAttribute('height', vb.height * zoom);
+}
+function fit() {
+  const svg = $('diagram').querySelector('svg');
+  if (!svg) return;
+  const vb = svg.viewBox.baseVal, box = $('diagram');
+  zoom = Math.min(1.6, (box.clientWidth - 24) / vb.width, (box.clientHeight - 24) / vb.height);
+  applyZoom();
+}
+$('zin').onclick = () => { zoom *= 1.2; applyZoom(); };
+$('zout').onclick = () => { zoom /= 1.2; applyZoom(); };
+$('zfit').onclick = fit;
+
+let timer;
+src.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(update, 200); });
+$('reset').onclick = () => { src.value = SAMPLE; showChange(null); update().then(fit); };
+
+function renderTabs() {
+  $('tabs').innerHTML = '';
+  SCENARIOS.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    b.className = i === active ? 'on' : '';
+    b.onclick = () => startScenario(i);
+    $('tabs').append(b);
+  });
+  const s = SCENARIOS[active];
+  $('scenario').innerHTML = `<p>${s.desc}</p><div class="steps"></div>
+    <p class="muted" style="margin:10px 0 0">Starting a walkthrough resets the file to the sample.</p>`;
+  const steps = $('scenario').querySelector('.steps');
+  s.steps.forEach((st, i) => {
+    const b = document.createElement('button');
+    b.textContent = `${i + 1}. ${st.label}`;
+    if (i < stepIdx) b.className = 'done';
+    if (i === stepIdx) b.className = 'primary';
+    b.disabled = i !== stepIdx;
+    b.onclick = () => runStep(st);
+    steps.append(b);
+  });
+}
+
+function startScenario(i) {
+  active = i; stepIdx = 0;
+  src.value = SAMPLE;
+  showChange(null);
+  renderTabs();
+  update().then(fit);
+}
+
+function runStep(st) {
+  const r = st.run(src.value);
+  src.value = r.text;
+  showChange(r);
+  stepIdx++;
+  renderTabs();
+  update();
+  if (r.line) {
+    const lines = src.value.split('\n');
+    const start = lines.slice(0, r.line - 1).join('\n').length + (r.line > 1 ? 1 : 0);
+    src.focus();
+    src.setSelectionRange(start, start + lines[r.line - 1].length);
+  }
+}
+
+function showChange(r) {
+  const el = $('change');
+  if (!r) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (r.note) { el.textContent = `Edit: ${r.note}`; return; }
+  el.innerHTML = `Edit on line ${r.line}:\n` +
+    (r.before != null ? `<span class="minus">- ${escapeHtml(r.before)}</span>\n` : '') +
+    `<span class="plus">+ ${escapeHtml(r.after)}</span>`;
+}
+
+src.value = SAMPLE;
+renderTabs();
+update().then(fit);
+</script>
+</body>
+</html>

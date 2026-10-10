@@ -6,11 +6,11 @@ A locally run web app that turns a one-fact-per-line text file into an interacti
 
 ### Issue tracker
 
-Local markdown under `.scratch/<feature>/` (spec in `spec.md`, tickets in `issues/NN-<slug>.md`). See `docs/agents/issue-tracker.md`.
+GitHub Issues on `ChinthakaJay/org-visualizer`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default vocabulary, recorded as a `Status:` line in each issue file: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
+Default vocabulary, applied as GitHub labels: needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
