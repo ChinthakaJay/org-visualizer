@@ -1,5 +1,5 @@
 import type { ElkExtendedEdge, ElkNode } from 'elkjs/lib/elk-api';
-import { paletteHue, parseColour, type Hue, type TeamColour } from './colours';
+import { functionColours, functionKey, paletteHue, parseColour, type Hue, type TeamColour } from './colours';
 import { teamChain, type Org, type Person, type Team } from './org';
 
 export interface Point { x: number; y: number }
@@ -25,6 +25,8 @@ export interface PersonCard extends Rect {
   name: string;
   role: string | null;
   fn: string | null;
+  /** The Function badge's colour; null when there's no Function. */
+  fnColour: Hue | null;
   /** The Team's colour, for a faint tint; null for a card outside every Team. */
   tint: TeamColour | null;
   team: string | null;
@@ -190,6 +192,7 @@ export async function buildScene(
   const scene: Scene = { width: laid.width ?? 0, height: laid.height ?? 0, teams: [], people: [], lines: [], counts };
 
   const colours = new Map<string, TeamColour | null>();
+  const fnColours = functionColours([...people.values()].flatMap((p) => (p.fn ? [p.fn] : [])));
   const walk = (node: ElkNode, offset: Point, depth: number, inherited: Hue | null) => {
     for (const child of node.children ?? []) {
       const at = { x: offset.x + (child.x ?? 0), y: offset.y + (child.y ?? 0) };
@@ -210,7 +213,7 @@ export async function buildScene(
       } else {
         const p = people.get(id)!;
         scene.people.push({
-          ...rect, id, name: p.name, role: p.role, fn: p.fn, tint: (p.team && colours.get(p.team)) || null,
+          ...rect, id, name: p.name, role: p.role, fn: p.fn, fnColour: (p.fn && fnColours.get(functionKey(p.fn))) || null, tint: (p.team && colours.get(p.team)) || null,
           team: p.team, line: p.line, placeholder: p.placeholder,
           tooltip: {
             id,

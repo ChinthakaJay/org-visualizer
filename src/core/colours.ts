@@ -48,6 +48,35 @@ export function paletteHue(id: string): Hue {
   return { hue: PALETTE[(hash >>> 0) % PALETTE.length], saturation: PALETTE_SATURATION };
 }
 
+/** Function badge colours, ordered so the first few in use are as far apart as possible. */
+const FUNCTION_PALETTE: Hue[] = [
+  { hue: 214, saturation: 70 }, // blue
+  { hue: 28, saturation: 80 }, // orange
+  { hue: 140, saturation: 55 }, // green
+  { hue: 318, saturation: 60 }, // magenta
+  { hue: 46, saturation: 85 }, // yellow
+  { hue: 270, saturation: 55 }, // purple
+  { hue: 190, saturation: 70 }, // cyan
+  { hue: 356, saturation: 70 }, // red
+  { hue: 90, saturation: 60 }, // lime
+  { hue: 236, saturation: 60 }, // indigo
+  { hue: 168, saturation: 60 }, // teal
+  { hue: 334, saturation: 70 }, // pink
+];
+
+/** How Functions are compared: ignoring case and outer spaces. */
+export const functionKey = (fn: string) => fn.trim().toLowerCase();
+
+/**
+ * Badge colours for the Functions in use. The distinct Functions are sorted by name and handed
+ * palette colours in turn, so up to twelve always look different. Adding a Function can shift the
+ * colours of those that sort after it; the order of lines never matters.
+ */
+export function functionColours(fns: Iterable<string>): Map<string, Hue> {
+  const keys = [...new Set([...fns].map(functionKey))].filter(Boolean).sort();
+  return new Map(keys.map((key, i) => [key, FUNCTION_PALETTE[i % FUNCTION_PALETTE.length]]));
+}
+
 /** Reads a `color=` value: a name from the list above, or #rgb / #rrggbb. Null if it isn't one. */
 export function parseColour(value: string): Hue | null {
   const v = value.trim().toLowerCase();

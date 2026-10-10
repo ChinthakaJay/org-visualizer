@@ -1,5 +1,5 @@
 import { forwardRef, memo, useState } from 'react';
-import type { PersonCard, Point, Scene, SceneLine, TeamBox, TeamColour } from '../core';
+import type { Hue, PersonCard, Point, Scene, SceneLine, TeamBox, TeamColour } from '../core';
 import { TEAM_HEADER } from '../core';
 import { CHART_CSS } from './chartStyles';
 
@@ -213,7 +213,7 @@ function PersonCardView({ person, highlighted, onSelectLine, onDefine, onHover }
       <rect className="card-box" x={x} y={y} width={width} height={height} rx={8} />
       <text className="card-name" x={x + 12} y={y + 24}>{clip(person.name, 22)}</text>
       {fn && (
-        <g className="fn-badge">
+        <g className="fn-badge" style={fnColourVars(person.fnColour)}>
           <rect x={x + 12} y={y + 34} width={badgeWidth} height={17} rx={8.5} />
           <text x={x + 12 + badgeWidth / 2} y={y + 46} textAnchor="middle">{fn}</text>
         </g>
@@ -277,6 +277,12 @@ const MAX_SHADE = 4;
 function colourVars(colour: TeamColour | null): React.CSSProperties | undefined {
   if (!colour) return undefined;
   return { '--h': colour.hue, '--s': colour.saturation, '--shade': Math.min(colour.shade, MAX_SHADE) } as React.CSSProperties;
+}
+
+/** Function colour as the custom properties the badge styles read. */
+function fnColourVars(colour: Hue | null): React.CSSProperties | undefined {
+  if (!colour) return undefined;
+  return { '--fh': colour.hue, '--fs': colour.saturation } as React.CSSProperties;
 }
 
 const pathOf = (points: Point[]) => points.map((p, i) => `${i ? 'L' : 'M'}${p.x},${p.y}`).join(' ');

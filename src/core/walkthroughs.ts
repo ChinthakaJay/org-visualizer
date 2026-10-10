@@ -86,7 +86,7 @@ export const WALKTHROUGHS: Walkthrough[] = [
   {
     name: 'Function',
     description:
-      "A Function is the kind of work someone does, shown as a small badge on their card. It's any word you like, and it belongs to the Person, not their Team.",
+      "A Function is the kind of work someone does, shown as a small badge on their card, in a colour of its own. It's any word you like, and it belongs to the Person, not their Team.",
     steps: [
       { label: 'Hal works in Ops', run: (t) => setField(t, 'person', 'hal', 'fn', 'ops') },
       { label: 'Dan moves from engineering to data', run: (t) => setField(t, 'person', 'dan', 'fn', 'data') },
