@@ -1,0 +1,58 @@
+# sample.txt: a fictional company, showing what Org Visualizer can draw.
+# Run it with:  npm start -- sample.txt
+#
+# One fact per line, in any order. Lines starting with # are comments.
+#   Teams:   team <id> : <Title> | parent=<team-id> | color=<name or #hex>
+#   People:  <id> : <Name> | team=<team-id> | reports=<person-id or ?> | role=… | fn=… | dotted=<id>,…
+#   Any other key=value on a Person (met=, location=, …) is kept as a detail and shown on hover.
+
+# ── Teams ─────────────────────────────────────────────────────────────
+# Top-level Teams get a stable colour of their own; sub-teams take shades of it.
+team product : Product & Engineering
+team commerce : Commerce | parent=product
+team checkout : Checkout | parent=commerce
+team payments : Payments | parent=commerce
+team fraud : Fraud Detection | parent=payments
+team growth : Growth | parent=product | color=teal
+team platform : Platform | color=indigo
+team infra : Infrastructure | parent=platform
+team data : Data | parent=platform | color=#d97706
+team ops : Operations
+
+# ── Leadership ────────────────────────────────────────────────────────
+maya : Maya Chen | team=product | role=VP Engineering | fn=eng | location=London
+omar : Omar Haddad | team=product | role=VP Product | fn=product | reports=maya
+
+# ── Commerce ──────────────────────────────────────────────────────────
+lena : Lena Fischer | team=commerce | role=Director | fn=eng | reports=maya
+raj : Raj Patel | team=checkout | role=EM | fn=eng | reports=lena | met=2025 offsite
+sofia : Sofia Rossi | team=checkout | fn=eng | reports=raj
+tom : Tom Becker | team=checkout | fn=eng | reports=raj
+ines : Ines Duarte | team=checkout | role=PM | fn=product | reports=omar | dotted=raj
+kai : Kai Tanaka | team=checkout | role=Designer | fn=design | reports=nadia
+priya : Priya Nair | team=payments | role=EM | fn=eng | reports=lena
+ben : Ben Okafor | team=payments | fn=eng | reports=priya
+yuki : Yuki Sato | team=fraud | role=Tech Lead | fn=eng | reports=priya
+amir : Amir Rahimi | team=fraud | role=Data Scientist | fn=data | reports=ola | dotted=yuki
+
+# ── Growth ────────────────────────────────────────────────────────────
+nadia : Nadia Ivanova | team=growth | role=Head of Design | fn=design | reports=omar
+leo : Leo Martin | team=growth | role=PM | fn=product | reports=omar
+cara : Cara Walsh | team=growth | fn=eng | reports=? # manager not known yet
+
+# ── Platform ──────────────────────────────────────────────────────────
+# Reporting lines cross Team boxes: Platform reports into Product & Engineering.
+victor : Victor Alves | team=platform | role=Director | fn=eng | reports=maya
+hana : Hana Kim | team=infra | role=SRE Lead | fn=eng | reports=victor | dotted=priya
+max : Max Weber | team=infra | fn=eng | reports=hana
+ola : Ola Nowak | team=data | role=Data Lead | fn=data | reports=victor
+jin : Jin Park | team=data | fn=data | reports=ola
+
+# ── Operations ────────────────────────────────────────────────────────
+grace : Grace Moore | team=ops | role=COO | fn=ops
+pete : Pete Lund | team=ops | fn=ops | reports=grace | dotted=hana
+
+# ── Partial knowledge ─────────────────────────────────────────────────
+# People and Teams that are referenced but not defined yet are drawn dashed (Placeholders).
+sam : Sam Reyes | team=security | role=Security Lead | reports=ceo
+zoe : Zoe Adams # team and manager unknown
